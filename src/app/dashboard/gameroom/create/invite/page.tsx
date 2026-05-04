@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Users2, ArrowRight, ArrowLeft, RefreshCw, Search, Check, Plus, AlertCircle, Heart } from "lucide-react";
@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabase/client";
 import { toast } from "react-hot-toast";
 import { usePresence } from "@/hooks/usePresence";
 
-export default function InviteFriendsPage() {
+function InviteFriendsContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const roomId = searchParams.get("roomId");
@@ -266,5 +266,13 @@ export default function InviteFriendsPage() {
                 </button>
             </div>
         </div>
+    );
+}
+
+export default function InviteFriendsPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><RefreshCw className="w-8 h-8 text-purple-500 animate-spin" /></div>}>
+            <InviteFriendsContent />
+        </Suspense>
     );
 }

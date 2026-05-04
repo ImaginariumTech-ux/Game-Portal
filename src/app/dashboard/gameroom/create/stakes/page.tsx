@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Wallet, ArrowRight, ArrowLeft, RefreshCw, AlertCircle, Coins, Info, Trophy, LayoutGrid, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
-export default function StakesConfigurationPage() {
+function StakesConfigurationContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const roomId = searchParams.get("roomId");
@@ -241,5 +241,13 @@ export default function StakesConfigurationPage() {
                 </button>
             </div>
         </div>
+    );
+}
+
+export default function StakesConfigurationPage() {
+    return (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><RefreshCw className="w-8 h-8 text-purple-500 animate-spin" /></div>}>
+            <StakesConfigurationContent />
+        </Suspense>
     );
 }
