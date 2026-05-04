@@ -5,12 +5,15 @@ info:
     This API documentation is for game developers integrating their games into the MagicGames portal.
     
     The portal loads games inside an iframe and passes the `roomId` as a query parameter.
-    Games should use the Supabase client to interact with the data described below.
+    
+    **Note**: While this documentation describes the data schema, developers should access the live data directly via **Supabase** using the following credentials:
+    - **Supabase URL**: `https://etschqfatclugukntchl.supabase.co`
+    - **Anon Key**: (Check your secure project settings)
   version: 1.0.0
 
 servers:
-  - url: https://magicgames.portal/api
-    description: Portal API (Conceptual)
+  - url: https://game-portal-cyan.vercel.app/api
+    description: Production API Base (Vercel)
 
 paths:
   /rooms/{roomId}:
