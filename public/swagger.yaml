@@ -1,0 +1,132 @@
+openapi: 3.0.0
+info:
+  title: MagicGames Portal Integration API
+  description: |
+    This API documentation is for game developers integrating their games into the MagicGames portal.
+    
+    The portal loads games inside an iframe and passes the `roomId` as a query parameter.
+    Games should use the Supabase client to interact with the data described below.
+  version: 1.0.0
+
+servers:
+  - url: https://magicgames.portal/api
+    description: Portal API (Conceptual)
+
+paths:
+  /rooms/{roomId}:
+    get:
+      summary: Get Room Details
+      description: Fetches the metadata for a specific game room.
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          description: The unique ID of the game room.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Room details retrieved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Room'
+
+  /rooms/{roomId}/players:
+    get:
+      summary: Get Players and Characters
+      description: Fetches all players currently in the room, including their selected characters and profile info.
+      parameters:
+        - name: roomId
+          in: path
+          required: true
+          description: The unique ID of the game room.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of players and their characters.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Player'
+
+components:
+  schemas:
+    Room:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Friday Night Ludo"
+          description: "The name of the game room as set by the host."
+        status:
+          type: string
+          enum: [forming, live, dissolved]
+          description: "Current state of the room. 'live' means the match has started."
+        max_players:
+          type: integer
+          example: 4
+        player_count:
+          type: integer
+          example: 2
+          description: "The current number of players in the room."
+        stake_amount:
+          type: number
+          example: 50.0
+
+    Player:
+      type: object
+      properties:
+        user_id:
+          type: string
+          format: uuid
+        is_ready:
+          type: boolean
+        character_id:
+          type: string
+          format: uuid
+        profile:
+          $ref: '#/components/schemas/Profile'
+        character:
+          $ref: '#/components/schemas/Character'
+
+    Profile:
+      type: object
+      properties:
+        username:
+          type: string
+          example: "gamer_pro"
+        full_name:
+          type: string
+          example: "John Doe"
+        avatar_url:
+          type: string
+          format: uri
+
+    Character:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: "Red Warrior"
+        image_url:
+          type: string
+          format: uri
+          example: "https://.../characters/warrior.png"
+
+tags:
+  - name: Room
+    description: Room management and metadata
+  - name: Game
+    description: Game lifecycle and player data
