@@ -42,3 +42,11 @@ next-env.d.ts
 
 # sensitive database scripts
 *.sql
+
+# temporary scratch and diagnostic scripts
+/scratch/
+check_roles.ts
+extract_text.js
+extracted_spec.txt
+extracted_spec_utf8.txt
+MAGICGAMES_API_DOCS.md
