@@ -7,7 +7,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
     Sparkles, Search, Bell, Wallet, Home, Gamepad2, Users,
-    HelpCircle, BarChart3, LogOut, Folder, MapPin, Calendar, Zap, LayoutGrid, DoorOpen, Trophy
+    HelpCircle, BarChart3, LogOut, Folder, MapPin, Calendar, Zap, LayoutGrid, DoorOpen, Trophy, Menu
 } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 
@@ -39,6 +39,7 @@ export default function CollectionsPage() {
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
     const [location, setLocation] = useState("");
     const [joinDate, setJoinDate] = useState("");
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
         const init = async () => {
@@ -85,12 +86,23 @@ export default function CollectionsPage() {
     return (
         <div className="flex h-screen bg-[#0d0f14] text-white font-sans overflow-hidden">
             {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
-            <Sidebar currentActiveId="collections" />
+            <Sidebar 
+                currentActiveId="collections" 
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+            />
 
             {/* ── Main ─────────────────────────────────────────────────────────────── */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Top Bar */}
                 <header className="h-12 flex-shrink-0 bg-[#111318] border-b border-white/5 flex items-center px-4 gap-3">
+                    {/* Mobile Toggle */}
+                    <button 
+                        onClick={() => setIsSidebarOpen(true)}
+                        className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white transition-colors"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
                     <div className="flex items-center gap-2 bg-[#1a1d24] border border-white/5 rounded-full px-3 py-1.5">
                         <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
                             <span className="text-[8px] font-black text-white">M</span>

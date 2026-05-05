@@ -17,7 +17,8 @@ import {
     Trash2,
     XCircle,
     CheckCircle2,
-    Clock
+    Clock,
+    Menu
 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 import Sidebar from "@/components/dashboard/Sidebar";
@@ -59,6 +60,7 @@ export default function GameRoomPage() {
     const [myRoom, setMyRoom] = useState<Room | null>(null);
     const [myInvites, setMyInvites] = useState<any[]>([]);
     const [cancelling, setCancelling] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
         let roomSubscription: any;
@@ -230,10 +232,39 @@ export default function GameRoomPage() {
 
     return (
         <div className="flex h-screen bg-[#0d0f14] text-white font-sans overflow-hidden">
-            <Sidebar currentActiveId="gameroom" />
+            <Sidebar 
+                currentActiveId="gameroom" 
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+            />
 
             <div className="flex-1 flex flex-col overflow-hidden bg-[#090b0f] relative">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-purple-900/20 blur-[120px] rounded-full pointer-events-none" />
+
+                {/* Top Bar (Consistent with other pages) */}
+                <header className="h-12 flex-shrink-0 bg-transparent border-b border-white/5 flex items-center px-4 gap-3 relative z-20">
+                    <button 
+                        onClick={() => setIsSidebarOpen(true)}
+                        className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white transition-colors"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
+                    <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md border border-white/5 rounded-full px-3 py-1.5">
+                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                            <span className="text-[8px] font-black text-white">M</span>
+                        </div>
+                        <span className="text-sm font-bold text-white">1,022.00</span>
+                    </div>
+                    <button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[10px] font-bold px-3 py-1 rounded-full transition-all flex items-center gap-1.5">
+                        <Wallet className="w-3 h-3" /> Wallet
+                    </button>
+                    <div className="ml-auto flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 bg-black/40 px-2 py-1 rounded-full border border-white/5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Online</span>
+                        </div>
+                    </div>
+                </header>
 
                 <main className="flex-1 overflow-y-auto relative z-10 no-scrollbar">
                     <header className="pt-16 pb-8 px-8 md:px-12">

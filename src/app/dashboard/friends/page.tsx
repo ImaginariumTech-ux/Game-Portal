@@ -8,7 +8,7 @@ import Link from "next/link";
 import {
     Home, Gamepad2, Folder, DoorOpen, Users, Trophy, Bell,
     LogOut, Search, UserMinus, UserCheck, CheckCircle, XCircle, UserPlus,
-    Sparkles, Zap, MapPin, Calendar, Heart, Shield, ExternalLink
+    Sparkles, Zap, MapPin, Calendar, Heart, Shield, ExternalLink, Menu, Wallet
 } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 import { usePresence } from "@/hooks/usePresence";
@@ -58,6 +58,7 @@ export default function FriendsPage() {
     // Sidebar states
     const [fullName, setFullName] = useState("");
     const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
         const init = async () => {
@@ -211,12 +212,41 @@ export default function FriendsPage() {
         <div className="flex h-screen bg-[#0d0f14] text-white font-sans overflow-hidden">
             {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
             {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
-            <Sidebar currentActiveId="friends" />
+            <Sidebar 
+                currentActiveId="friends" 
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+            />
             {/* ── Main content ──────────────────────────────────────────────────────── */}
             <div className="flex-1 flex flex-col overflow-hidden relative bg-[#090b0f]">
                 {/* Background ambient glow */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-purple-900/20 blur-[120px] rounded-full pointer-events-none opacity-50 mix-blend-screen"></div>
                 <div className="absolute top-1/4 -right-32 w-[600px] h-[600px] bg-indigo-900/10 blur-[100px] rounded-full pointer-events-none opacity-50"></div>
+                
+                {/* Top Bar (Consistent with other pages) */}
+                <header className="h-12 flex-shrink-0 bg-transparent border-b border-white/5 flex items-center px-4 gap-3 relative z-20">
+                    <button 
+                        onClick={() => setIsSidebarOpen(true)}
+                        className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white transition-colors"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
+                    <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md border border-white/5 rounded-full px-3 py-1.5">
+                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                            <span className="text-[8px] font-black text-white">M</span>
+                        </div>
+                        <span className="text-sm font-bold text-white">1,022.00</span>
+                    </div>
+                    <button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-[10px] font-bold px-3 py-1 rounded-full transition-all flex items-center gap-1.5">
+                        <Wallet className="w-3 h-3" /> Wallet
+                    </button>
+                    <div className="ml-auto flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 bg-black/40 px-2 py-1 rounded-full border border-white/5">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Online</span>
+                        </div>
+                    </div>
+                </header>
 
                 <main className="flex-1 overflow-y-auto relative z-10 w-full no-scrollbar">
 

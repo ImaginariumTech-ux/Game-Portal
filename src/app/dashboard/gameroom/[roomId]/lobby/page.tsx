@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import { 
@@ -96,6 +96,27 @@ export default function GameLobbyPage() {
     const [error, setError] = useState<string | null>(null);
     const [availableCharacters, setAvailableCharacters] = useState<any[]>([]);
     const [selectingCharacter, setSelectingCharacter] = useState<string | null>(null);
+
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+
+    // Send room info to game via postMessage when live
+    useEffect(() => {
+        if (room?.status === 'live' && iframeRef.current) {
+            const handleLoad = () => {
+                iframeRef.current?.contentWindow?.postMessage({
+                    type: 'ROOM_INFO',
+                    roomId: roomId,
+                    myRoomId: roomId, // Fallback name
+                    gameUrl: room.game?.game_url
+                }, '*');
+            };
+
+            const iframe = iframeRef.current;
+            iframe.addEventListener('load', handleLoad);
+            return () => iframe.removeEventListener('load', handleLoad);
+        }
+    }, [room?.status, roomId]);
 
     // Real-time presence for friends
     const { onlineUserIds, isOnline } = usePresence(user?.id);
@@ -484,19 +505,21 @@ export default function GameLobbyPage() {
     if (isLive) {
         const baseUrl = room.game?.game_url || "";
         const separator = baseUrl.includes("?") ? "&" : "?";
-        const finalUrl = `${baseUrl}${separator}roomId=${roomId}`;
+        // Passing both roomId and myRoomId for maximum compatibility with dev scripts
+        const finalUrl = `${baseUrl}${separator}roomId=${roomId}&myRoomId=${roomId}`;
 
         return (
             <div className="fixed inset-0 z-[1000] bg-black">
                 <iframe 
+                    ref={iframeRef}
                     src={finalUrl}
                     className="w-full h-full border-none"
-                    allow="autoplay; fullscreen; pointer-lock"
+                    allow="autoplay; fullscreen"
                 />
                 {/* Overlay to exit if needed or show info */}
                 <div className="absolute top-4 left-4 group">
                     <button 
-                        onClick={() => router.push("/dashboard/gameroom")}
+                    onClick={() => router.push("/dashboard/gameroom")}
                         className="p-3 bg-black/40 backdrop-blur-md border border-white/10 rounded-2xl text-white/40 hover:text-white transition-all opacity-0 group-hover:opacity-100"
                     >
                         <ArrowLeft className="w-5 h-5" />

@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import Image from "next/image";
 import {
     Home, Gamepad2, Folder, DoorOpen, Users, Trophy,
-    HelpCircle, BarChart3, Globe, MapPin, Calendar, LogOut
+    HelpCircle, BarChart3, Globe, MapPin, Calendar, LogOut, X, Menu
 } from "lucide-react";
 import { usePresence } from "@/hooks/usePresence";
 
@@ -22,9 +22,11 @@ const NAV_ITEMS = [
 interface SidebarProps {
     onNavItemClick?: (id: string) => void;
     currentActiveId?: string;
+    isOpen?: boolean;
+    onClose?: () => void;
 }
 
-export default function Sidebar({ onNavItemClick, currentActiveId }: SidebarProps) {
+export default function Sidebar({ onNavItemClick, currentActiveId, isOpen, onClose }: SidebarProps) {
     const router = useRouter();
     const pathname = usePathname();
 
@@ -123,18 +125,37 @@ export default function Sidebar({ onNavItemClick, currentActiveId }: SidebarProp
     }
 
     return (
-        <aside className="w-52 flex-shrink-0 bg-[#111318] border-r border-white/5 flex flex-col z-20">
-            {/* Logo */}
-            <div className="p-4 border-b border-white/5">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 relative rounded-lg overflow-hidden bg-purple-600/20 border border-purple-500/30">
-                        <Image src="/magic-logo-white.png" alt="Logo" fill className="object-contain p-1" />
+        <>
+            {/* Mobile Overlay */}
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-300"
+                    onClick={onClose}
+                />
+            )}
+
+            <aside className={`
+                fixed inset-y-0 left-0 z-50 w-64 bg-[#111318] border-r border-white/5 flex flex-col 
+                transform transition-transform duration-300 ease-in-out
+                ${isOpen ? "translate-x-0" : "-translate-x-full"}
+                md:relative md:translate-x-0 md:w-52 md:flex-shrink-0
+            `}>
+                {/* Logo & Close Button */}
+                <div className="p-4 border-b border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 relative rounded-lg overflow-hidden bg-purple-600/20 border border-purple-500/30">
+                            <Image src="/magic-logo-white.png" alt="Logo" fill className="object-contain p-1" />
+                        </div>
+                        <span className="font-bold text-sm bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                            Magic Games
+                        </span>
                     </div>
-                    <span className="font-bold text-sm bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
-                        Magic Games
-                    </span>
+                    {onClose && (
+                        <button onClick={onClose} className="md:hidden p-2 text-gray-500 hover:text-white transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
+                    )}
                 </div>
-            </div>
 
             {/* Player profile mini-card */}
             <div className="p-3 border-b border-white/5">
@@ -227,5 +248,6 @@ export default function Sidebar({ onNavItemClick, currentActiveId }: SidebarProp
                 </button>
             </div>
         </aside>
+    </>
     );
 }

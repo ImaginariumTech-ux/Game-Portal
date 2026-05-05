@@ -8,7 +8,7 @@ import Link from "next/link";
 import {
     ArrowLeft, Home, Gamepad2, Folder, DoorOpen, Users, Trophy,
     HelpCircle, BarChart3, LogOut, CheckCircle, XCircle, UserPlus,
-    UserMinus, UserCheck, Calendar, MapPin, Sparkles, Zap, Bell, Wallet, Star
+    UserMinus, UserCheck, Calendar, MapPin, Sparkles, Zap, Bell, Wallet, Star, Menu
 } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 
@@ -45,6 +45,7 @@ export default function GamerProfilePage() {
     const [friendshipStatus, setFriendshipStatus] = useState("none");
     const [friendshipId, setFriendshipId] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
         const init = async () => {
@@ -179,11 +180,21 @@ export default function GamerProfilePage() {
     return (
         <div className="flex h-screen bg-[#0d0f14] text-white font-sans overflow-hidden">
             {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
-            <Sidebar currentActiveId="home" />
+            <Sidebar 
+                currentActiveId="home" 
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+            />
 
             {/* ── Main content ──────────────────────────────────────────────────────── */}
             <div className="flex-1 flex flex-col overflow-hidden relative">
-                <header className="absolute top-0 left-0 w-full h-16 z-20 flex items-center px-6">
+                <header className="absolute top-0 left-0 w-full h-16 z-20 flex items-center px-6 gap-3">
+                    <button 
+                        onClick={() => setIsSidebarOpen(true)}
+                        className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white transition-colors bg-black/40 backdrop-blur-md rounded-full border border-white/10"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
                     <Link href="/dashboard/friends" className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-black/60 transition">
                         <ArrowLeft className="w-5 h-5" />
                     </Link>
