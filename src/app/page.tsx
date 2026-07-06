@@ -89,7 +89,9 @@ export default function UserAuth() {
           }
         }
 
-        alert("Account created! Please check your email to confirm.");
+        alert("Account created successfully!");
+        setIsSignUp(false);
+        setStep(1);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;

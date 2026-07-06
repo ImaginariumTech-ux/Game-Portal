@@ -51,20 +51,16 @@ const NAV_ITEMS = [
     { icon: <Home className="w-4 h-4" />, label: "Home", id: "home", href: "/dashboard" },
     { icon: <Gamepad2 className="w-4 h-4" />, label: "Games", id: "games", href: "/dashboard/games" },
     { icon: <Folder className="w-4 h-4" />, label: "Collections", id: "collections", href: "/dashboard/collections" },
-    { icon: <DoorOpen className="w-4 h-4" />, label: "Game Room", id: "gameroom", href: null },
-    { icon: <Users className="w-4 h-4" />, label: "Friends", id: "friends", href: "/dashboard/friends" },
-    { icon: <Trophy className="w-4 h-4" />, label: "Leaderboard", id: "leaderboard", href: null },
+    { icon: <Trophy className="w-4 h-4" />, label: "Tournaments", id: "leaderboard", href: "/dashboard/leaderboard" },
 ];
 
-// ─── Gradient palette for game cards (cycles) ──────────────────────────────────
-
 const GRADIENTS = [
-    { from: "from-emerald-900 via-green-800 to-teal-900", accent: "#10b981" },
-    { from: "from-amber-900 via-orange-800 to-red-900", accent: "#f59e0b" },
-    { from: "from-violet-900 via-purple-800 to-indigo-900", accent: "#8b5cf6" },
-    { from: "from-blue-900 via-cyan-800 to-sky-900", accent: "#3b82f6" },
-    { from: "from-pink-900 via-rose-800 to-red-900", accent: "#ec4899" },
-    { from: "from-lime-900 via-green-800 to-emerald-900", accent: "#84cc16" },
+    { from: "from-emerald-50 to-teal-100", accent: "#10b981", text: "text-emerald-700" },
+    { from: "from-amber-50 to-orange-100", accent: "#f59e0b", text: "text-amber-700" },
+    { from: "from-violet-50 to-indigo-100", accent: "#8b5cf6", text: "text-violet-700" },
+    { from: "from-blue-50 to-sky-100", accent: "#3b82f6", text: "text-blue-700" },
+    { from: "from-pink-50 to-rose-100", accent: "#ec4899", text: "text-pink-700" },
+    { from: "from-lime-50 to-emerald-100", accent: "#84cc16", text: "text-lime-700" },
 ];
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -243,9 +239,52 @@ export default function UserDashboard() {
         router.push("/");
     };
 
-    const handlePlayGame = (game: Game) => {
-        if (game.game_url) {
-            window.open(game.game_url, "_blank");
+    const handlePlayGame = async (game: Game) => {
+        if (!game.game_url) return;
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                router.push("/");
+                return;
+            }
+
+            // Create a practice room
+            const roomId = crypto.randomUUID();
+            const joinCode = `PRACTICE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+            // Increment plays count in DB
+            await supabase.rpc('increment_game_plays', { p_game_id: game.id });
+
+            // Insert game_room
+            const { error: roomErr } = await supabase.from('game_rooms').insert({
+                id: roomId,
+                name: `Practice: ${game.title}`,
+                host_id: user.id,
+                game_id: game.id,
+                mode: 'practice',
+                status: 'live',
+                stake_amount: 0,
+                join_code: joinCode,
+                max_players: 1
+            });
+
+            if (roomErr) throw roomErr;
+
+            // Insert room_player membership
+            const { error: playerErr } = await supabase.from('room_players').insert({
+                room_id: roomId,
+                user_id: user.id,
+                status: 'joined',
+                is_ready: true
+            });
+
+            if (playerErr) throw playerErr;
+
+            // Redirect to the unified play page
+            router.push(`/dashboard/play/${roomId}`);
+        } catch (err) {
+            console.error("Error launching practice session:", err);
+            alert("Failed to start practice session");
         }
     };
 
@@ -277,17 +316,17 @@ export default function UserDashboard() {
 
     if (loading) {
         return (
-            <div className="flex h-screen w-full items-center justify-center bg-[#0d0f14] text-white">
+            <div className="flex h-screen w-full items-center justify-center bg-slate-50 text-slate-900">
                 <div className="flex flex-col items-center gap-3">
-                    <Sparkles className="w-8 h-8 animate-spin text-purple-500" />
-                    <p className="text-sm text-gray-400">Loading your adventure...</p>
+                    <Sparkles className="w-8 h-8 animate-spin text-purple-600" />
+                    <p className="text-sm text-slate-500">Loading your adventure...</p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="flex h-screen w-full bg-[#0d0f14] text-white font-sans overflow-hidden">
+        <div className="flex h-screen w-full bg-slate-50 text-slate-900 font-sans overflow-hidden">
 
             {/* ── Sidebar ─────────────────────────────────────────────────────────── */}
             <Sidebar 
@@ -301,21 +340,21 @@ export default function UserDashboard() {
             <div className="flex-1 flex flex-col overflow-hidden">
 
                 {/* Top Bar */}
-                <header className="h-12 flex-shrink-0 bg-[#111318] border-b border-white/5 flex items-center px-4 gap-3">
+                <header className="h-12 flex-shrink-0 bg-white border-b border-slate-200 flex items-center px-4 gap-3">
                     {/* Mobile Toggle */}
                     <button 
                         onClick={() => setIsSidebarOpen(true)}
-                        className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white transition-colors"
+                        className="md:hidden p-2 -ml-2 text-slate-400 hover:text-slate-600 transition-colors"
                     >
                         <Menu className="w-5 h-5" />
                     </button>
 
                     {/* Coins */}
-                    <div className="flex items-center gap-2 bg-[#1a1d24] border border-white/5 rounded-full px-3 py-1.5">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
                         <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
                             <span className="text-[8px] font-black text-white">M</span>
                         </div>
-                        <span className="text-sm font-bold text-white">1,022.00</span>
+                        <span className="text-sm font-bold text-slate-800">1,022.00</span>
                     </div>
 
                     <button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5">
@@ -326,32 +365,32 @@ export default function UserDashboard() {
 
                     {/* Search */}
                     <div className="relative">
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500" />
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                         <input
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-[#1a1d24] border border-white/5 rounded-full pl-7 pr-3 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-purple-500/50 w-40"
+                            className="bg-slate-50 border border-slate-200 rounded-full pl-7 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-500/50 w-40"
                             placeholder="Search games..."
                         />
                     </div>
 
                     {/* Notif */}
-                    <button className="relative w-8 h-8 rounded-full bg-[#1a1d24] border border-white/5 flex items-center justify-center hover:bg-white/10 transition-all">
-                        <Bell className="w-3.5 h-3.5 text-gray-400" />
+                    <button className="relative w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center hover:bg-slate-100 transition-all">
+                        <Bell className="w-3.5 h-3.5 text-slate-500" />
                         <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-red-500 rounded-full" />
                     </button>
 
                     {/* User */}
-                    <div className="flex items-center gap-2 bg-[#1a1d24] border border-white/5 rounded-full pl-1 pr-3 py-1">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-[10px] font-bold">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full pl-1 pr-3 py-1">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-[10px] font-bold text-white">
                             {displayName[0]?.toUpperCase()}
                         </div>
-                        <span className="text-xs font-medium text-gray-300">{displayName}</span>
+                        <span className="text-xs font-semibold text-slate-700">{displayName}</span>
                     </div>
 
                     {/* Logout */}
-                    <button onClick={handleLogout} className="w-8 h-8 rounded-full bg-[#1a1d24] border border-white/5 flex items-center justify-center hover:bg-red-500/20 hover:border-red-500/30 transition-all group">
-                        <LogOut className="w-3.5 h-3.5 text-gray-400 group-hover:text-red-400" />
+                    <button onClick={handleLogout} className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center hover:bg-red-50 hover:border-red-200 transition-all group">
+                        <LogOut className="w-3.5 h-3.5 text-slate-500 group-hover:text-red-600" />
                     </button>
                 </header>
 
@@ -361,137 +400,30 @@ export default function UserDashboard() {
                     {/* ── Scrollable center ─────────────────────────────────────────── */}
                     <div className="flex-1 overflow-y-auto p-4 space-y-5">
 
-                        {/* Room Invites Alert */}
-                        {pendingInvites.length > 0 && (
-                            <div className="relative overflow-hidden bg-gradient-to-r from-amber-600/20 to-orange-600/20 border border-amber-500/30 rounded-2xl p-4 shadow-[0_0_20px_rgba(245,158,11,0.1)]">
-                                <div className="absolute top-0 right-0 p-1 opacity-20"><DoorOpen className="w-16 h-16" /></div>
-                                <div className="flex items-center gap-4 relative z-10">
-                                    <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center animate-pulse">
-                                        <Bell className="w-6 h-6 text-amber-500" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className="font-black text-white text-lg">New Room Invite!</h3>
-                                        <p className="text-sm text-amber-200/70">
-                                            <span className="font-bold text-amber-400">{pendingInvites[0].inviter?.full_name || pendingInvites[0].inviter?.username}</span> invited you to join <span className="text-white font-bold">"{pendingInvites[0].room?.name}"</span>
-                                        </p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => handleAcceptInvite(pendingInvites[0])}
-                                            className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wider rounded-lg transition-all"
-                                        >
-                                            Accept
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeclineInvite(pendingInvites[0].id)}
-                                            className="px-4 py-2 bg-white/5 border border-white/10 hover:bg-white/10 text-white font-black text-xs uppercase tracking-wider rounded-lg transition-all"
-                                        >
-                                            Decline
-                                        </button>
-                                    </div>
-                                </div>
-                                {pendingInvites.length > 1 && (
-                                    <button
-                                        onClick={() => router.push("/dashboard/gameroom")}
-                                        className="mt-3 text-[10px] font-bold text-amber-400/80 hover:text-amber-300 flex items-center gap-1 transition-all"
-                                    >
-                                        See all {pendingInvites.length} invites <ExternalLink className="w-2.5 h-2.5" />
-                                    </button>
-                                )}
-                            </div>
-                        )}
 
-                        {/* Mobile Friends Section (Collapsible) */}
-                        <div className="md:hidden bg-[#111318] border border-white/5 rounded-2xl overflow-hidden shadow-xl">
-                            <button 
-                                onClick={() => setIsFriendsCollapsed(!isFriendsCollapsed)}
-                                className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                                        <Users className="w-4 h-4 text-purple-400" />
-                                    </div>
-                                    <div className="text-left">
-                                        <h3 className="text-sm font-bold text-white">Friends</h3>
-                                        <p className="text-[10px] text-gray-500">
-                                            {onlineFriendsCount} online • {realFriends.length} total
-                                        </p>
-                                    </div>
-                                </div>
-                                {isFriendsCollapsed ? <ChevronDown className="w-4 h-4 text-gray-500" /> : <ChevronUp className="w-4 h-4 text-gray-500" />}
-                            </button>
 
-                            {!isFriendsCollapsed && (
-                                <div className="p-2 pt-0 space-y-1 animate-in slide-in-from-top-2 duration-200">
-                                    {realFriends.length === 0 ? (
-                                        <div className="py-8 text-center text-gray-600">
-                                            <p className="text-[10px]">Add friends to see them here</p>
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 gap-1">
-                                            {realFriends.map((friend) => {
-                                                const online = isOnline(friend.friend_id);
-                                                const name = friend.profiles?.full_name || friend.profiles?.username || "Gamer";
-                                                return (
-                                                    <div
-                                                        key={friend.id}
-                                                        onClick={() => router.push(`/dashboard/gamers/${friend.friend_id}`)}
-                                                        className="flex items-center gap-3 bg-[#1a1d24] rounded-xl p-3 border border-white/5 hover:border-purple-500/30 transition-all cursor-pointer group active:scale-[0.98]"
-                                                    >
-                                                        <div className="relative flex-shrink-0">
-                                                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-black overflow-hidden relative border border-white/10 shadow-lg">
-                                                                {friend.profiles?.avatar_url ? (
-                                                                    <Image src={friend.profiles.avatar_url} alt={name} fill className="object-cover" />
-                                                                ) : (
-                                                                    name[0]?.toUpperCase()
-                                                                )}
-                                                            </div>
-                                                            <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#1a1d24] ${online ? "bg-green-500" : "bg-gray-600 shadow-inner"}`} />
-                                                        </div>
-                                                        <div className="min-w-0 flex-1">
-                                                            <p className="text-xs font-bold text-white truncate group-hover:text-purple-300 transition-colors">{name}</p>
-                                                            <p className={`text-[10px] font-medium ${online ? "text-green-400" : "text-gray-500"}`}>
-                                                                {online ? "Playing now" : "Offline"}
-                                                            </p>
-                                                        </div>
-                                                        <div className="p-2 bg-white/5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <ExternalLink className="w-3 h-3 text-gray-400" />
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                    <button
-                                        onClick={() => router.push("/dashboard/friends")}
-                                        className="w-full py-3 mt-2 rounded-xl bg-purple-600/10 hover:bg-purple-600/20 border border-purple-500/20 text-purple-400 text-xs font-bold transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <Users className="w-3.5 h-3.5" /> Manage My Squad
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+
 
                         {/* Welcome banner */}
-                        <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-purple-900/60 via-blue-900/40 to-indigo-900/60 border border-white/10 p-5">
+                        <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-purple-600 to-indigo-600 border border-purple-700/10 p-5 shadow-sm text-white">
                             <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
                             <div className="relative z-10 flex items-center justify-between">
                                 <div>
                                     <h1 className="text-xl font-black mb-0.5">Welcome back, {displayName}! 👋</h1>
-                                    <p className="text-sm text-gray-300">
+                                    <p className="text-sm text-white/90">
                                         {games.length > 0
                                             ? `${games.length} game${games.length !== 1 ? "s" : ""} available to play right now`
                                             : "Your adventure awaits — games coming soon!"}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">
-                                    <div className="text-center bg-black/30 rounded-xl px-4 py-2 border border-white/5">
-                                        <p className="text-xl font-black text-purple-400">{games.length}</p>
-                                        <p className="text-[9px] text-gray-400 uppercase tracking-wide">Games</p>
+                                    <div className="text-center bg-white/10 rounded-xl px-4 py-2 border border-white/10">
+                                        <p className="text-xl font-black text-white">{games.length}</p>
+                                        <p className="text-[9px] text-white/80 uppercase tracking-wide">Games</p>
                                     </div>
-                                    <div className="text-center bg-black/30 rounded-xl px-4 py-2 border border-white/5">
-                                        <p className="text-xl font-black text-blue-400">{collections.length}</p>
-                                        <p className="text-[9px] text-gray-400 uppercase tracking-wide">Collections</p>
+                                    <div className="text-center bg-white/10 rounded-xl px-4 py-2 border border-white/10">
+                                        <p className="text-xl font-black text-white">{collections.length}</p>
+                                        <p className="text-[9px] text-white/80 uppercase tracking-wide">Collections</p>
                                     </div>
                                 </div>
                             </div>
@@ -501,14 +433,14 @@ export default function UserDashboard() {
                         {featuredGames.length > 0 && (
                             <div>
                                 <div className="flex items-center gap-2 mb-3">
-                                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                                    <h2 className="font-bold text-sm uppercase tracking-wide">Featured Games</h2>
-                                    <span className="ml-auto text-[9px] text-gray-500 font-medium uppercase tracking-wider">Curated by Admin</span>
+                                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                                    <h2 className="font-bold text-sm uppercase tracking-wide text-slate-800">Featured Games</h2>
+                                    <span className="ml-auto text-[9px] text-slate-400 font-medium uppercase tracking-wider">Curated by Admin</span>
                                 </div>
 
                                 {/* Big hero card — first featured game */}
                                 {featuredGames[0] && (
-                                    <div className="relative h-52 rounded-2xl overflow-hidden group mb-3">
+                                    <div className="relative h-52 rounded-2xl overflow-hidden group mb-3 shadow-md">
                                         {featuredGames[0].thumbnail_url ? (
                                             <Image
                                                 src={featuredGames[0].thumbnail_url}
@@ -517,26 +449,21 @@ export default function UserDashboard() {
                                                 className="object-cover transition-transform duration-700 group-hover:scale-105"
                                             />
                                         ) : (
-                                            <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900" />
+                                            <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600" />
                                         )}
-                                        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent" />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                                        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
                                         <div className="absolute bottom-0 left-0 p-5 w-2/3">
                                             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 text-[9px] font-bold mb-2 backdrop-blur-md">
                                                 <Star className="w-2.5 h-2.5 fill-current" /> Featured
                                             </div>
-                                            <h2 className="text-2xl font-black mb-1 leading-tight">{featuredGames[0].title}</h2>
-                                            <p className="text-gray-300 text-xs mb-3 line-clamp-2">
+                                            <h2 className="text-2xl font-black mb-1 leading-tight text-white">{featuredGames[0].title}</h2>
+                                            <p className="text-white/90 text-xs mb-3 line-clamp-2">
                                                 {featuredGames[0].description || "No description provided."}
                                             </p>
                                             <button
-                                                onClick={() => {
-                                                    if (featuredGames[0].game_url) {
-                                                        supabase.rpc('increment_game_plays', { p_game_id: featuredGames[0].id });
-                                                        window.open(featuredGames[0].game_url, '_blank');
-                                                    }
-                                                }}
+                                                onClick={() => handlePlayGame(featuredGames[0])}
                                                 disabled={!featuredGames[0].game_url}
                                                 className="px-5 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-purple-500/20 transition-all transform hover:-translate-y-0.5 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
@@ -546,7 +473,7 @@ export default function UserDashboard() {
                                         </div>
 
                                         {/* Plays badge */}
-                                        <div className="absolute top-3 right-3 bg-black/60 backdrop-blur-md rounded-lg px-2 py-1 flex items-center gap-1 border border-white/10">
+                                        <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md rounded-lg px-2 py-1 flex items-center gap-1 border border-white/10">
                                             <Zap className="w-2.5 h-2.5 text-yellow-400" />
                                             <span className="text-[9px] font-bold text-white">{(featuredGames[0].plays || 0).toLocaleString()} plays</span>
                                         </div>
@@ -557,8 +484,8 @@ export default function UserDashboard() {
                                 {featuredGames.length > 1 && (
                                     <div className="grid grid-cols-2 gap-3">
                                         {featuredGames.slice(1, 3).map((game, i) => (
-                                            <div key={game.id} className="relative h-28 rounded-xl overflow-hidden group cursor-pointer"
-                                                onClick={() => { if (game.game_url) { supabase.rpc('increment_game_plays', { p_game_id: game.id }); window.open(game.game_url, '_blank'); } }}
+                                            <div key={game.id} className="relative h-28 rounded-xl overflow-hidden group cursor-pointer shadow-sm"
+                                                onClick={() => handlePlayGame(game)}
                                             >
                                                 {game.thumbnail_url ? (
                                                     <Image src={game.thumbnail_url} alt={game.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -568,11 +495,11 @@ export default function UserDashboard() {
                                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                                                 <div className="absolute bottom-0 left-0 p-3">
                                                     <p className="text-xs font-bold text-white leading-tight">{game.title}</p>
-                                                    <p className="text-[8px] text-gray-400 flex items-center gap-1 mt-0.5">
+                                                    <p className="text-[8px] text-white/80 flex items-center gap-1 mt-0.5">
                                                         <Play className="w-2 h-2" />{(game.plays || 0).toLocaleString()} plays
                                                     </p>
                                                 </div>
-                                                <div className="absolute top-2 right-2 bg-black/50 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="absolute top-2 right-2 bg-black/40 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     <Play className="w-3 h-3 text-white fill-white" />
                                                 </div>
                                             </div>
@@ -586,14 +513,14 @@ export default function UserDashboard() {
 
 
                         {/* Tabs */}
-                        <div className="flex items-center gap-1 bg-[#111318] border border-white/5 rounded-xl p-1">
+                        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
                             {["ALL", "TOP", "FAV"].map((tab) => (
                                 <button
                                     key={tab}
                                     onClick={() => setActiveTab(tab)}
-                                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-wide transition-all ${activeTab === tab
-                                        ? "bg-purple-600/30 text-purple-300 border border-purple-500/30"
-                                        : "text-gray-500 hover:text-gray-300"
+                                    className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold tracking-wide transition-all cursor-pointer ${activeTab === tab
+                                        ? "bg-purple-50 text-purple-600 border border-purple-200/40 shadow-sm"
+                                        : "text-slate-500 hover:text-slate-800"
                                         }`}
                                 >
                                     {tab === "ALL" ? "All Games" : tab === "TOP" ? "🔥 Top Rated" : "⭐ Favourites"}
@@ -603,15 +530,15 @@ export default function UserDashboard() {
 
                         {/* Games grid */}
                         {displayedGames.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-20 text-gray-500 gap-4">
-                                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
-                                    <Gamepad2 className="w-8 h-8 opacity-40" />
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-500 gap-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+                                <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                                    <Gamepad2 className="w-8 h-8 opacity-40 text-slate-400" />
                                 </div>
                                 <p className="text-sm font-medium">
                                     {searchQuery ? `No games matching "${searchQuery}"` : "No games available yet"}
                                 </p>
                                 {searchQuery && (
-                                    <button onClick={() => setSearchQuery("")} className="text-xs text-purple-400 hover:text-purple-300">
+                                    <button onClick={() => setSearchQuery("")} className="text-xs text-purple-600 hover:text-purple-700 font-semibold">
                                         Clear search
                                     </button>
                                 )}
@@ -620,11 +547,11 @@ export default function UserDashboard() {
                             <div>
                                 <div className="flex items-center justify-between mb-3">
                                     <div className="flex items-center gap-2">
-                                        <Sparkles className="w-4 h-4 text-yellow-500" />
-                                        <h3 className="font-bold text-sm uppercase tracking-wide">
+                                        <Sparkles className="w-4 h-4 text-purple-600" />
+                                        <h3 className="font-bold text-sm uppercase tracking-wide text-slate-800">
                                             {activeTab === "TOP" ? "Top Rated Games" : activeTab === "NEW" ? "Newest Games" : "All Games"}
                                         </h3>
-                                        <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">
+                                        <span className="text-[10px] text-slate-500 bg-slate-100 border border-slate-200/60 px-2 py-0.5 rounded-full">
                                             {displayedGames.length}
                                         </span>
                                     </div>
@@ -636,11 +563,10 @@ export default function UserDashboard() {
                                             <div
                                                 key={game.id}
                                                 onClick={() => router.push(`/dashboard/games/${game.id}`)}
-                                                className={`relative rounded-xl overflow-hidden border border-white/10 group cursor-pointer transition-all hover:scale-[1.03] hover:border-white/20 bg-gradient-to-br ${grad.from}`}
-                                                style={{ boxShadow: `0 4px 20px ${grad.accent}15` }}
+                                                className="relative rounded-xl overflow-hidden border border-slate-200 group cursor-pointer transition-all hover:scale-[1.03] hover:border-purple-300 hover:shadow-md bg-white flex flex-col justify-between"
                                             >
                                                 {/* Thumbnail or gradient placeholder */}
-                                                <div className="relative h-28 overflow-hidden">
+                                                <div className={`relative h-28 overflow-hidden bg-gradient-to-br ${grad.from}`}>
                                                     {game.thumbnail_url ? (
                                                         <Image
                                                             src={game.thumbnail_url}
@@ -650,41 +576,43 @@ export default function UserDashboard() {
                                                         />
                                                     ) : (
                                                         <div className="absolute inset-0 flex items-center justify-center">
-                                                            <Gamepad2 className="w-10 h-10 opacity-30" />
+                                                            <Gamepad2 className={`w-10 h-10 opacity-30 ${grad.text}`} />
                                                         </div>
                                                     )}
                                                     {/* Play overlay */}
-                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                         <div className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/30">
                                                             <Play className="w-4 h-4 fill-white text-white ml-0.5" />
                                                         </div>
                                                     </div>
                                                     {/* Rating badge if exists */}
                                                     {game.avg_rating && game.avg_rating > 0 && (
-                                                        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 z-10">
-                                                            <Star className="w-2 h-2 text-yellow-400 fill-yellow-400" />
+                                                        <div className="absolute top-2 left-2 bg-white/80 backdrop-blur-sm text-slate-800 text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 z-10 border border-slate-200/50">
+                                                            <Star className="w-2 h-2 text-yellow-500 fill-yellow-500" />
                                                             {game.avg_rating.toFixed(1)}
                                                         </div>
                                                     )}
 
                                                     {/* Plays badge */}
                                                     {(game.plays || 0) > 0 && (
-                                                        <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                                                        <div className="absolute top-2 right-2 bg-white/80 backdrop-blur-sm text-slate-800 text-[8px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 border border-slate-200/50">
                                                             <Zap className="w-2 h-2" style={{ color: grad.accent }} />
                                                             {(game.plays || 0).toLocaleString()} plays
                                                         </div>
                                                     )}
                                                 </div>
 
-                                                <div className="p-3">
-                                                    <p className="text-xs font-bold text-white truncate mb-0.5">{game.title}</p>
-                                                    {game.description && (
-                                                        <p className="text-[9px] text-gray-400 line-clamp-2 mb-2">{game.description}</p>
-                                                    )}
+                                                <div className="p-3 flex-1 flex flex-col justify-between">
+                                                    <div>
+                                                        <p className="text-xs font-bold text-slate-800 truncate mb-0.5 group-hover:text-purple-600 transition-colors">{game.title}</p>
+                                                        {game.description && (
+                                                            <p className="text-[9px] text-slate-500 line-clamp-2 mb-2 leading-relaxed">{game.description}</p>
+                                                        )}
+                                                    </div>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handlePlayGame(game); }}
                                                         disabled={!game.game_url}
-                                                        className="w-full py-1.5 rounded-lg text-[10px] font-black text-white transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1"
+                                                        className="w-full py-1.5 rounded-lg text-[10px] font-black text-white transition-all hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 cursor-pointer"
                                                         style={{ background: `linear-gradient(135deg, ${grad.accent}, ${grad.accent}99)` }}
                                                     >
                                                         {game.game_url ? (
@@ -703,76 +631,7 @@ export default function UserDashboard() {
 
                     </div>
 
-                    {/* ── Friends Panel ─────────────────────────────────────────────── */}
-                    <aside className="hidden md:flex w-52 flex-shrink-0 bg-[#111318] border-l border-white/5 flex-col">
-                        {/* Header */}
-                        <div className="p-3 border-b border-white/5">
-                            <div className="flex items-center gap-2">
-                                <Users className="w-3.5 h-3.5 text-purple-400" />
-                                <span className="text-xs font-bold">Friends</span>
-                                {onlineFriendsCount > 0 && (
-                                    <span className="ml-auto flex items-center gap-1 bg-green-500/20 text-green-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-green-500/30">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                                        {onlineFriendsCount} online
-                                    </span>
-                                )}
-                                {onlineFriendsCount === 0 && (
-                                    <span className="ml-auto bg-purple-500/20 text-purple-400 text-[9px] font-bold px-1.5 py-0.5 rounded-full border border-purple-500/30">
-                                        {realFriends.length} friends
-                                    </span>
-                                )}
-                            </div>
-                        </div>
 
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                            {realFriends.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full gap-2 text-gray-600 py-8">
-                                    <Users className="w-6 h-6 opacity-30" />
-                                    <p className="text-[9px] text-center">Add friends to see them here</p>
-                                </div>
-                            ) : (
-                                realFriends.map((friend) => {
-                                    const online = isOnline(friend.friend_id);
-                                    const name = friend.profiles?.full_name || friend.profiles?.username || "Gamer";
-                                    return (
-                                        <div
-                                            key={friend.id}
-                                            onClick={() => router.push(`/dashboard/gamers/${friend.friend_id}`)}
-                                            className="flex items-center gap-2 bg-[#1a1d24] rounded-lg p-2 border border-white/5 hover:border-white/10 transition-all cursor-pointer group"
-                                        >
-                                            <div className="relative flex-shrink-0">
-                                                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-[10px] font-black overflow-hidden relative">
-                                                    {friend.profiles?.avatar_url ? (
-                                                        <Image src={friend.profiles.avatar_url} alt={name} fill className="object-cover" />
-                                                    ) : (
-                                                        name[0]?.toUpperCase()
-                                                    )}
-                                                </div>
-                                                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#1a1d24] ${online ? "bg-green-500" : "bg-gray-600"
-                                                    }`} />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="text-[10px] font-bold text-white truncate group-hover:text-purple-300 transition-colors">{name}</p>
-                                                <p className={`text-[8px] ${online ? "text-green-400" : "text-gray-500"}`}>
-                                                    {online ? "Online" : "Offline"}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )}
-                        </div>
-
-                        {/* Add friend link */}
-                        <div className="p-2 border-t border-white/5">
-                            <button
-                                onClick={() => router.push("/dashboard/friends")}
-                                className="w-full py-2 rounded-lg bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-[10px] font-bold transition-all flex items-center justify-center gap-1.5"
-                            >
-                                <Users className="w-3 h-3" /> Manage Friends
-                            </button>
-                        </div>
-                    </aside>
 
                 </div>
             </div>

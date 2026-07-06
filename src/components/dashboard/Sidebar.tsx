@@ -14,9 +14,7 @@ const NAV_ITEMS = [
     { icon: <Home className="w-4 h-4" />, label: "Home", id: "home", href: "/dashboard" },
     { icon: <Gamepad2 className="w-4 h-4" />, label: "Games", id: "games", href: "/dashboard/games" },
     { icon: <Folder className="w-4 h-4" />, label: "Collections", id: "collections", href: "/dashboard/collections" },
-    { icon: <DoorOpen className="w-4 h-4" />, label: "Game Room", id: "gameroom", href: "/dashboard/gameroom" },
-    { icon: <Users className="w-4 h-4" />, label: "Friends", id: "friends", href: "/dashboard/friends" },
-    { icon: <Trophy className="w-4 h-4" />, label: "Leaderboard", id: "leaderboard", href: null },
+    { icon: <Trophy className="w-4 h-4" />, label: "Tournaments", id: "leaderboard", href: "/dashboard/leaderboard" },
 ];
 
 interface SidebarProps {
@@ -135,55 +133,55 @@ export default function Sidebar({ onNavItemClick, currentActiveId, isOpen, onClo
             )}
 
             <aside className={`
-                fixed inset-y-0 left-0 z-50 w-64 bg-[#111318] border-r border-white/5 flex flex-col 
+                fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 flex flex-col 
                 transform transition-transform duration-300 ease-in-out
                 ${isOpen ? "translate-x-0" : "-translate-x-full"}
                 md:relative md:translate-x-0 md:w-52 md:flex-shrink-0
             `}>
                 {/* Logo & Close Button */}
-                <div className="p-4 border-b border-white/5 flex items-center justify-between">
+                <div className="p-4 border-b border-slate-200/80 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 relative rounded-lg overflow-hidden bg-purple-600/20 border border-purple-500/30">
-                            <Image src="/magic-logo-white.png" alt="Logo" fill className="object-contain p-1" />
+                        <div className="w-8 h-8 relative rounded-lg overflow-hidden bg-purple-100 border border-purple-200">
+                            <Image src="/magic-logo-white.png" alt="Logo" fill className="object-contain p-1 filter invert brightness-0" />
                         </div>
-                        <span className="font-bold text-sm bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent">
+                        <span className="font-black text-sm bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
                             Magic Games
                         </span>
                     </div>
                     {onClose && (
-                        <button onClick={onClose} className="md:hidden p-2 text-gray-500 hover:text-white transition-colors">
+                        <button onClick={onClose} className="md:hidden p-2 text-slate-400 hover:text-slate-700 transition-colors">
                             <X className="w-5 h-5" />
                         </button>
                     )}
                 </div>
 
             {/* Player profile mini-card */}
-            <div className="p-3 border-b border-white/5">
-                <div className="bg-gradient-to-br from-purple-900/30 to-blue-900/30 border border-white/5 rounded-xl p-3">
+            <div className="p-3 border-b border-slate-200/80">
+                <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 shadow-sm">
                     <div className="flex items-center gap-2.5 mb-2">
                         {avatarUrl ? (
-                            <div className="w-9 h-9 relative rounded-full overflow-hidden flex-shrink-0 border border-white/10">
+                            <div className="w-9 h-9 relative rounded-full overflow-hidden flex-shrink-0 border border-slate-200">
                                 <Image src={avatarUrl} alt="Avatar" fill className="object-cover" />
                             </div>
                         ) : (
-                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-sm font-black flex-shrink-0">
+                            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-sm font-black text-white flex-shrink-0 shadow-sm">
                                 {displayName[0]?.toUpperCase() || "G"}
                             </div>
                         )}
                         <div className="min-w-0">
-                            <p className="text-xs font-bold text-white truncate">{fullName}</p>
-                            <p className="text-[9px] text-purple-400 font-medium">Player</p>
+                            <p className="text-xs font-bold text-slate-800 truncate">{fullName}</p>
+                            <p className="text-[9px] text-purple-600 font-semibold">Player</p>
                         </div>
                     </div>
                     <div className="space-y-1">
                         {location && (
-                            <div className="flex items-center gap-1.5 text-[9px] text-gray-400">
+                            <div className="flex items-center gap-1.5 text-[9px] text-slate-500">
                                 <MapPin className="w-2.5 h-2.5 flex-shrink-0" />
                                 <span className="truncate">{location}</span>
                             </div>
                         )}
                         {joinDate && (
-                            <div className="flex items-center gap-1.5 text-[9px] text-gray-400">
+                            <div className="flex items-center gap-1.5 text-[9px] text-slate-500">
                                 <Calendar className="w-2.5 h-2.5 flex-shrink-0" />
                                 <span>Joined {joinDate}</span>
                             </div>
@@ -204,23 +202,23 @@ export default function Sidebar({ onNavItemClick, currentActiveId, isOpen, onClo
                                 onNavItemClick(item.id);
                             }
                         }}
-                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${activePathId === item.id
-                            ? "bg-purple-600/20 text-purple-300 border border-purple-500/20"
-                            : "text-gray-400 hover:bg-white/5 hover:text-white"
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all ${activePathId === item.id
+                            ? "bg-purple-50 text-purple-700 border border-purple-200/50"
+                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                             }`}
                     >
                         {item.icon}
                         {item.label}
                         {/* Live online badge on Friends nav item */}
                         {item.id === "friends" && onlineFriendsCount > 0 && (
-                            <span className="ml-auto flex items-center gap-1 bg-green-500/20 text-green-400 text-[8px] font-bold px-1.5 py-0.5 rounded-full border border-green-500/30">
-                                <span className="w-1 h-1 rounded-full bg-green-400 animate-pulse" />
+                            <span className="ml-auto flex items-center gap-1 bg-green-50 text-green-700 text-[8px] font-bold px-1.5 py-0.5 rounded-full border border-green-200/50">
+                                <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
                                 {onlineFriendsCount}
                             </span>
                         )}
                         {/* Live invite badge on Game Room nav item */}
                         {item.id === "gameroom" && inviteCount > 0 && (
-                            <span className="ml-auto flex items-center justify-center w-4 h-4 bg-amber-500 text-black text-[10px] font-black rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)] animate-bounce">
+                            <span className="ml-auto flex items-center justify-center w-4 h-4 bg-amber-500 text-white text-[10px] font-black rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)] animate-bounce">
                                 {inviteCount}
                             </span>
                         )}
@@ -229,20 +227,20 @@ export default function Sidebar({ onNavItemClick, currentActiveId, isOpen, onClo
             </nav>
 
             {/* Bottom */}
-            <div className="p-3 border-t border-white/5 space-y-0.5">
-                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all">
+            <div className="p-3 border-t border-slate-200/80 space-y-0.5">
+                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all">
                     <HelpCircle className="w-3.5 h-3.5" /> Help Center
                 </button>
-                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all">
+                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all">
                     <BarChart3 className="w-3.5 h-3.5" /> Rank System
                 </button>
-                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-all">
+                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all">
                     <Globe className="w-3.5 h-3.5" /> English
                 </button>
                 {/* Ensure friends page and others with logout buttons also see logout on standard sidebar */}
                 <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-red-500 hover:bg-red-500/10 hover:text-red-400 border border-transparent hover:border-red-500/20 transition-all mt-2"
+                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs text-red-600 hover:bg-red-50 hover:text-red-700 border border-transparent hover:border-red-100 transition-all mt-2"
                 >
                     <LogOut className="w-3.5 h-3.5" /> Disconnect
                 </button>

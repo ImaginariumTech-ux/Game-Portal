@@ -84,7 +84,7 @@ export default function CollectionsPage() {
     );
 
     return (
-        <div className="flex h-screen bg-[#0d0f14] text-white font-sans overflow-hidden">
+        <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
             {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
             <Sidebar 
                 currentActiveId="collections" 
@@ -95,28 +95,28 @@ export default function CollectionsPage() {
             {/* ── Main ─────────────────────────────────────────────────────────────── */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Top Bar */}
-                <header className="h-12 flex-shrink-0 bg-[#111318] border-b border-white/5 flex items-center px-4 gap-3">
+                <header className="h-12 flex-shrink-0 bg-white border-b border-slate-200 flex items-center px-4 gap-3">
                     {/* Mobile Toggle */}
                     <button 
                         onClick={() => setIsSidebarOpen(true)}
-                        className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white transition-colors"
+                        className="md:hidden p-2 -ml-2 text-slate-400 hover:text-slate-600 transition-colors"
                     >
                         <Menu className="w-5 h-5" />
                     </button>
-                    <div className="flex items-center gap-2 bg-[#1a1d24] border border-white/5 rounded-full px-3 py-1.5">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
                         <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
                             <span className="text-[8px] font-black text-white">M</span>
                         </div>
-                        <span className="text-sm font-bold text-white">1,022.00</span>
+                        <span className="text-sm font-bold text-slate-800">1,022.00</span>
                     </div>
 
                     <div className="ml-auto flex items-center gap-2">
                         <div className="relative">
-                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-500" />
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400 pointer-events-none" />
                             <input
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="bg-[#1a1d24] border border-white/5 rounded-full pl-7 pr-3 py-1.5 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-purple-500/50 w-48"
+                                className="bg-slate-50 border border-slate-200 rounded-full pl-7 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-500/50 w-48 shadow-sm"
                                 placeholder="Search collections..."
                             />
                         </div>
@@ -126,9 +126,9 @@ export default function CollectionsPage() {
                 {/* Content */}
                 <main className="flex-1 overflow-y-auto p-6">
                     <div className="flex items-center gap-2 mb-6">
-                        <LayoutGrid className="w-5 h-5 text-purple-400" />
-                        <h1 className="text-xl font-bold uppercase tracking-wide">Collections</h1>
-                        <span className="text-xs text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">
+                        <LayoutGrid className="w-5 h-5 text-purple-600" />
+                        <h1 className="text-xl font-bold uppercase tracking-wide text-slate-900">Collections</h1>
+                        <span className="text-xs text-slate-500 bg-slate-100 border border-slate-200/55 px-2 py-0.5 rounded-full">
                             {collections.length}
                         </span>
                     </div>
@@ -136,15 +136,15 @@ export default function CollectionsPage() {
                     {loading ? (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                             {[1, 2, 3, 4].map((i) => (
-                                <div key={i} className="aspect-video rounded-2xl bg-white/5 animate-pulse" />
+                                <div key={i} className="aspect-video rounded-2xl bg-slate-200/60 animate-pulse" />
                             ))}
                         </div>
                     ) : filteredCollections.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-64 text-gray-500 gap-4">
-                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center">
-                                <Folder className="w-8 h-8 opacity-40" />
+                        <div className="flex flex-col items-center justify-center h-64 text-slate-400 gap-4 bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+                            <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                                <Folder className="w-8 h-8 opacity-40 text-slate-400" />
                             </div>
-                            <p className="text-sm font-medium">No collections found</p>
+                            <p className="text-sm font-medium text-slate-600">No collections found</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -152,10 +152,10 @@ export default function CollectionsPage() {
                                 <Link
                                     key={collection.id}
                                     href={`/dashboard/collections/${collection.id}`}
-                                    className="group relative bg-[#1a1d24] border border-white/5 hover:border-purple-500/30 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 hover:-translate-y-1 block"
+                                    className="group relative bg-white border border-slate-200 hover:border-purple-300 rounded-2xl overflow-hidden transition-all duration-300 hover:shadow-md hover:-translate-y-1 block"
                                 >
                                     {/* Image */}
-                                    <div className="aspect-video relative bg-black/50 overflow-hidden">
+                                    <div className="aspect-video relative bg-slate-100 overflow-hidden">
                                         {collection.image_url ? (
                                             <Image
                                                 src={collection.image_url}
@@ -164,28 +164,28 @@ export default function CollectionsPage() {
                                                 className="object-cover transition-transform duration-700 group-hover:scale-110"
                                             />
                                         ) : (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-900/40 to-indigo-900/40">
-                                                <Folder className="w-10 h-10 text-white/20 group-hover:text-purple-400/50 transition-colors" />
+                                            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-100 to-indigo-100">
+                                                <Folder className="w-10 h-10 text-purple-600/30 group-hover:text-purple-600/50 transition-colors" />
                                             </div>
                                         )}
-                                        <div className="absolute inset-0 bg-gradient-to-t from-[#1a1d24] via-transparent to-transparent opacity-80" />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent opacity-90" />
 
-                                        <div className="absolute bottom-0 left-0 p-4">
-                                            <h3 className="font-bold text-white text-lg leading-tight group-hover:text-purple-300 transition-colors mb-1">
+                                        <div className="absolute bottom-0 left-0 p-4 w-full">
+                                            <h3 className="font-bold text-slate-900 text-lg leading-tight group-hover:text-purple-600 transition-colors mb-1">
                                                 {collection.name}
                                             </h3>
-                                            <p className="text-xs text-gray-400 line-clamp-2">
+                                            <p className="text-xs text-slate-600 line-clamp-2">
                                                 {collection.description || "Explore this collection of amazing games."}
                                             </p>
                                         </div>
                                     </div>
 
                                     {/* Additional info footer */}
-                                    <div className="px-4 py-3 bg-[#111318] border-t border-white/5 flex items-center justify-between text-[10px] text-gray-500">
-                                        <span className="flex items-center gap-1 group-hover:text-purple-400 transition-colors">
+                                    <div className="px-4 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
+                                        <span className="flex items-center gap-1 group-hover:text-purple-600 transition-colors">
                                             View Collection
                                         </span>
-                                        <Folder className="w-3 h-3 group-hover:text-purple-400 transition-colors" />
+                                        <Folder className="w-3 h-3 group-hover:text-purple-600 transition-colors" />
                                     </div>
                                 </Link>
                             ))}

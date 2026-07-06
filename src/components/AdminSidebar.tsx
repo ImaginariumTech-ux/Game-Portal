@@ -10,6 +10,7 @@ import {
     LogOut,
     Key,
     FileCode,
+    Trophy,
 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
@@ -80,6 +81,12 @@ export default function AdminSidebar({ activeItem = "dashboard" }: AdminSidebarP
                     label="Games"
                     href="/magicadmins/games"
                     active={activeItem === "games"}
+                />
+                <NavItem
+                    icon={Trophy}
+                    label="Tournaments"
+                    href="/magicadmins/tournaments"
+                    active={activeItem === "tournaments"}
                 />
                 <NavItem
                     icon={LayoutGrid} // Using LayoutGrid as a placeholder, can be changed to something more appropriate like 'Library' or 'Folder' if available in lucide-react imports

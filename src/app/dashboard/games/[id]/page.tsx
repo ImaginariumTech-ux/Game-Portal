@@ -160,9 +160,51 @@ export default function GameDetailPage() {
 
     const handlePlay = async () => {
         if (!game?.game_url) return;
-        // Increment play count
-        await supabase.from("games").update({ plays: (game.plays || 0) + 1 }).eq("id", gameId);
-        window.open(game.game_url, "_blank");
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                router.push("/");
+                return;
+            }
+
+            // Create a practice room
+            const roomId = crypto.randomUUID();
+            const joinCode = `PRACTICE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+            // Increment plays count in DB
+            await supabase.from("games").update({ plays: (game.plays || 0) + 1 }).eq("id", gameId);
+
+            // Insert game_room
+            const { error: roomErr } = await supabase.from('game_rooms').insert({
+                id: roomId,
+                name: `Practice: ${game.title}`,
+                host_id: user.id,
+                game_id: game.id,
+                mode: 'practice',
+                status: 'live',
+                stake_amount: 0,
+                join_code: joinCode,
+                max_players: 1
+            });
+
+            if (roomErr) throw roomErr;
+
+            // Insert room_player membership
+            const { error: playerErr } = await supabase.from('room_players').insert({
+                room_id: roomId,
+                user_id: user.id,
+                status: 'joined',
+                is_ready: true
+            });
+
+            if (playerErr) throw playerErr;
+
+            // Redirect to the unified play page
+            router.push(`/dashboard/play/${roomId}`);
+        } catch (err) {
+            console.error("Error launching practice session:", err);
+            alert("Failed to start practice session");
+        }
     };
 
     const submitRating = async (stars: number) => {
@@ -193,18 +235,18 @@ export default function GameDetailPage() {
 
     if (loading) {
         return (
-            <div className="flex h-screen bg-[#0d0f14] items-center justify-center">
-                <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+            <div className="flex h-screen bg-slate-50 text-slate-900 items-center justify-center">
+                <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
             </div>
         );
     }
 
     if (notFound) {
         return (
-            <div className="flex h-screen bg-[#0d0f14] items-center justify-center flex-col gap-4">
-                <Gamepad2 className="w-16 h-16 text-gray-700" />
-                <p className="text-gray-400 text-lg font-semibold">Game not found</p>
-                <Link href="/dashboard/games" className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-1">
+            <div className="flex h-screen bg-slate-50 text-slate-900 items-center justify-center flex-col gap-4">
+                <Gamepad2 className="w-16 h-16 text-slate-300" />
+                <p className="text-slate-500 text-lg font-semibold">Game not found</p>
+                <Link href="/dashboard/games" className="text-purple-600 hover:text-purple-700 text-sm font-semibold flex items-center gap-1">
                     <ArrowLeft className="w-4 h-4" /> Back to Games
                 </Link>
             </div>
@@ -212,7 +254,7 @@ export default function GameDetailPage() {
     }
 
     return (
-        <div className="flex h-screen bg-[#0d0f14] text-white font-sans overflow-hidden">
+        <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
 
             {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
             <Sidebar currentActiveId="games" />
@@ -220,18 +262,18 @@ export default function GameDetailPage() {
             {/* ── Main ─────────────────────────────────────────────────────────────── */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Top Bar */}
-                <header className="h-12 flex-shrink-0 bg-[#111318] border-b border-white/5 flex items-center px-4 gap-3">
-                    <div className="flex items-center gap-2 bg-[#1a1d24] border border-white/5 rounded-full px-3 py-1.5">
+                <header className="h-12 flex-shrink-0 bg-white border-b border-slate-200 flex items-center px-4 gap-3">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
                         <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
                             <span className="text-[8px] font-black text-white">M</span>
                         </div>
-                        <span className="text-sm font-bold text-white">1,022.00</span>
+                        <span className="text-sm font-bold text-slate-800">1,022.00</span>
                     </div>
-                    <button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5">
+                    <button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5 cursor-pointer">
                         <Wallet className="w-3 h-3" /> Wallet
                     </button>
                     <div className="ml-auto flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 text-[10px] text-gray-400">
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                             <span>Online</span>
                         </div>
@@ -252,13 +294,13 @@ export default function GameDetailPage() {
                                         className="object-cover opacity-40"
                                     />
                                 )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-[#0d0f14] via-transparent to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-transparent to-transparent" />
 
                                 {/* Back button */}
                                 <div className="absolute top-4 left-4">
                                     <Link
                                         href="/dashboard/games"
-                                        className="flex items-center gap-2 text-white/70 hover:text-white text-sm font-medium bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-full transition-all hover:bg-black/50"
+                                        className="flex items-center gap-2 text-slate-800 hover:text-slate-950 text-sm font-medium bg-white/60 backdrop-blur-sm px-3 py-1.5 rounded-full transition-all hover:bg-white/80 border border-slate-200/50 shadow-sm"
                                     >
                                         <ArrowLeft className="w-4 h-4" /> Back to Games
                                     </Link>
@@ -266,43 +308,45 @@ export default function GameDetailPage() {
 
                                 {/* Featured badge */}
                                 {game.featured && (
-                                    <div className="absolute top-4 right-4 flex items-center gap-1 bg-yellow-500/90 backdrop-blur-sm text-black text-xs font-black px-2.5 py-1 rounded-full">
-                                        <Star className="w-3 h-3" fill="currentColor" /> FEATURED
+                                    <div className="absolute top-4 right-4 flex items-center gap-1 bg-yellow-500 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-sm">
+                                        <Star className="w-3 h-3 fill-current" /> FEATURED
                                     </div>
                                 )}
                             </div>
 
                             {/* Game Info */}
                             <div className="px-6 pb-6 -mt-16 relative z-10">
-                                <div className="flex items-end gap-5 mb-6">
-                                    {/* Thumbnail card */}
-                                    <div className="w-28 h-28 rounded-2xl overflow-hidden border-4 border-[#0d0f14] bg-gradient-to-br from-purple-900 to-indigo-900 flex-shrink-0 shadow-2xl">
-                                        {game.thumbnail_url ? (
-                                            <Image src={game.thumbnail_url} alt={game.title} width={112} height={112} className="object-cover w-full h-full" />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center">
-                                                <Gamepad2 className="w-10 h-10 text-white/30" />
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Title + actions */}
-                                    <div className="flex-1 min-w-0 pb-1">
-                                        <h1 className="text-2xl font-black text-white mb-1 leading-tight">{game.title}</h1>
-                                        <div className="flex items-center gap-3 flex-wrap">
-                                            {collections.map(col => (
-                                                <span key={col.id} className="flex items-center gap-1 text-xs text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 rounded-full">
-                                                    <Folder className="w-3 h-3" /> {col.name}
-                                                </span>
-                                            ))}
-                                            <span className="flex items-center gap-1 text-xs text-gray-500">
-                                                <TrendingUp className="w-3 h-3" /> {(game.plays || 0).toLocaleString()} plays
-                                            </span>
-                                            {game.version && (
-                                                <span className="flex items-center gap-1 text-xs text-gray-600">
-                                                    <Hash className="w-3 h-3" /> v{game.version}
-                                                </span>
+                                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-6">
+                                    <div className="flex items-end gap-5">
+                                        {/* Thumbnail card */}
+                                        <div className="w-28 h-28 rounded-2xl overflow-hidden border-4 border-slate-50 bg-gradient-to-br from-purple-100 to-indigo-100 flex-shrink-0 shadow-lg">
+                                            {game.thumbnail_url ? (
+                                                <Image src={game.thumbnail_url} alt={game.title} width={112} height={112} className="object-cover w-full h-full" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center">
+                                                    <Gamepad2 className="w-10 h-10 text-purple-600/30" />
+                                                </div>
                                             )}
+                                        </div>
+
+                                        {/* Title + actions */}
+                                        <div className="flex-1 min-w-0 pb-1">
+                                            <h1 className="text-2xl font-black text-slate-900 mb-1 leading-tight">{game.title}</h1>
+                                            <div className="flex items-center gap-3 flex-wrap">
+                                                {collections.map(col => (
+                                                    <span key={col.id} className="flex items-center gap-1 text-xs text-purple-600 bg-purple-50 border border-purple-200/50 px-2.5 py-0.5 rounded-full font-semibold shadow-sm">
+                                                        <Folder className="w-3 h-3" /> {col.name}
+                                                    </span>
+                                                ))}
+                                                <span className="flex items-center gap-1 text-xs text-slate-500">
+                                                    <TrendingUp className="w-3 h-3" /> {(game.plays || 0).toLocaleString()} plays
+                                                </span>
+                                                {game.version && (
+                                                    <span className="flex items-center gap-1 text-xs text-slate-400">
+                                                        <Hash className="w-3 h-3" /> v{game.version}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 
@@ -311,9 +355,9 @@ export default function GameDetailPage() {
                                         <button
                                             onClick={toggleFavourite}
                                             disabled={favouriteLoading}
-                                            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all border ${isFavourited
-                                                ? "bg-pink-500/20 text-pink-400 border-pink-500/30 hover:bg-pink-500/30"
-                                                : "bg-white/5 text-gray-400 border-white/10 hover:border-pink-500/30 hover:text-pink-400"
+                                            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all border cursor-pointer ${isFavourited
+                                                ? "bg-pink-50 text-pink-600 border-pink-200 shadow-sm hover:bg-pink-100/60"
+                                                : "bg-white text-slate-600 border-slate-200 hover:border-pink-200 hover:text-pink-600 hover:bg-pink-50/20 shadow-sm"
                                                 }`}
                                         >
                                             <Heart className={`w-4 h-4 ${isFavourited ? "fill-current" : ""}`} />
@@ -321,7 +365,7 @@ export default function GameDetailPage() {
                                         </button>
                                         <button
                                             onClick={handleShare}
-                                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-white/5 text-gray-400 border border-white/10 hover:border-white/20 hover:text-white transition-all"
+                                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-800 shadow-sm transition-all cursor-pointer"
                                         >
                                             {shared ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
                                             {shared ? "Copied!" : "Share"}
@@ -329,9 +373,9 @@ export default function GameDetailPage() {
                                         {game.game_url && (
                                             <button
                                                 onClick={handlePlay}
-                                                className="flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-500/30 transition-all hover:shadow-purple-500/50 hover:scale-105"
+                                                className="flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-sm transition-all hover:scale-105 cursor-pointer animate-in fade-in"
                                             >
-                                                <Play className="w-4 h-4" fill="white" /> Play Now
+                                                <Play className="w-4 h-4" fill="white" /> Play (Practice Mode)
                                             </button>
                                         )}
                                     </div>
@@ -341,29 +385,29 @@ export default function GameDetailPage() {
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                     {/* Description */}
                                     <div className="lg:col-span-2 space-y-4">
-                                        <div className="bg-[#1a1d24] rounded-2xl p-5 border border-white/5">
-                                            <h2 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                                                <Globe className="w-4 h-4 text-purple-400" /> About This Game
+                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                                            <h2 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                                <Globe className="w-4 h-4 text-purple-600" /> About This Game
                                             </h2>
                                             {game.description ? (
-                                                <p className="text-sm text-gray-400 leading-relaxed">{game.description}</p>
+                                                <p className="text-sm text-slate-600 leading-relaxed">{game.description}</p>
                                             ) : (
-                                                <p className="text-sm text-gray-600 italic">No description available.</p>
+                                                <p className="text-sm text-slate-400 italic">No description available.</p>
                                             )}
                                         </div>
 
                                         {/* Play button (large, if game_url exists) */}
                                         {game.game_url && (
-                                            <div className="bg-gradient-to-br from-purple-900/40 to-indigo-900/40 rounded-2xl p-5 border border-purple-500/20 flex items-center justify-between">
+                                            <div className="bg-gradient-to-br from-purple-50 to-indigo-50/50 rounded-2xl p-5 border border-purple-100 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-sm">
                                                 <div>
-                                                    <p className="text-white font-bold mb-0.5">Ready to play?</p>
-                                                    <p className="text-xs text-gray-400">Click play to launch the game in a new tab</p>
+                                                    <p className="text-slate-800 font-bold mb-0.5">Ready to practice?</p>
+                                                    <p className="text-xs text-slate-500">Click below to start a training match against the computer</p>
                                                 </div>
                                                 <button
                                                     onClick={handlePlay}
-                                                    className="flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-500/30 transition-all hover:shadow-purple-500/50 hover:scale-105"
+                                                    className="flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-sm transition-all hover:scale-105 cursor-pointer"
                                                 >
-                                                    <Play className="w-5 h-5" fill="white" /> Launch Game
+                                                    <Play className="w-5 h-5" fill="white" /> Play (Practice Mode)
                                                 </button>
                                             </div>
                                         )}
@@ -371,37 +415,37 @@ export default function GameDetailPage() {
 
                                     {/* Stats sidebar */}
                                     <div className="space-y-3">
-                                        <div className="bg-[#1a1d24] rounded-2xl p-5 border border-white/5">
-                                            <h2 className="text-sm font-bold text-white mb-4">Game Info</h2>
+                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                                            <h2 className="text-sm font-bold text-slate-800 mb-4">Game Info</h2>
                                             <div className="space-y-3">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-xs text-gray-500 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> Total Plays</span>
-                                                    <span className="text-sm font-bold text-white">{(game.plays || 0).toLocaleString()}</span>
+                                                    <span className="text-xs text-slate-500 flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5" /> Total Plays</span>
+                                                    <span className="text-sm font-bold text-slate-800">{(game.plays || 0).toLocaleString()}</span>
                                                 </div>
                                                 {game.version && (
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1.5"><Hash className="w-3.5 h-3.5" /> Version</span>
-                                                        <span className="text-sm font-bold text-white">v{game.version}</span>
+                                                        <span className="text-xs text-slate-500 flex items-center gap-1.5"><Hash className="w-3.5 h-3.5" /> Version</span>
+                                                        <span className="text-sm font-bold text-slate-800">v{game.version}</span>
                                                     </div>
                                                 )}
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-xs text-gray-500 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Added</span>
-                                                    <span className="text-sm font-bold text-white">
+                                                    <span className="text-xs text-slate-500 flex items-center gap-1.5"><Calendar className="w-3.5 h-3.5" /> Added</span>
+                                                    <span className="text-sm font-bold text-slate-800">
                                                         {new Date(game.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                                                     </span>
                                                 </div>
                                                 {game.featured && (
                                                     <div className="flex items-center justify-between">
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1.5"><Star className="w-3.5 h-3.5" /> Status</span>
-                                                        <span className="text-xs font-bold text-yellow-400 bg-yellow-500/10 px-2 py-0.5 rounded-full">⭐ Featured</span>
+                                                        <span className="text-xs text-slate-500 flex items-center gap-1.5"><Star className="w-3.5 h-3.5" /> Status</span>
+                                                        <span className="text-xs font-bold text-yellow-700 bg-yellow-50 px-2 py-0.5 rounded-full">⭐ Featured</span>
                                                     </div>
                                                 )}
                                                 {collections.length > 0 && (
-                                                    <div>
-                                                        <span className="text-xs text-gray-500 flex items-center gap-1.5 mb-2"><Folder className="w-3.5 h-3.5" /> Collections</span>
+                                                    <div className="border-t border-slate-100 pt-3 mt-3">
+                                                        <span className="text-xs text-slate-500 flex items-center gap-1.5 mb-2"><Folder className="w-3.5 h-3.5" /> Collections</span>
                                                         <div className="flex flex-wrap gap-1.5">
                                                             {collections.map(col => (
-                                                                <span key={col.id} className="text-[11px] font-semibold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-full">
+                                                                <span key={col.id} className="text-[11px] font-semibold text-purple-600 bg-purple-50 border border-purple-200/50 px-2 py-0.5 rounded-full">
                                                                     {col.name}
                                                                 </span>
                                                             ))}
@@ -411,15 +455,15 @@ export default function GameDetailPage() {
                                             </div>
                                         </div>
 
-                                        {/* Favourite card */}
-                                        <div className="bg-[#1a1d24] rounded-2xl p-5 border border-white/5">
-                                            <h2 className="text-sm font-bold text-white mb-3">Your Actions</h2>
+                                        {/* Actions card */}
+                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                                            <h2 className="text-sm font-bold text-slate-800 mb-3">Your Actions</h2>
                                             <div className="space-y-2">
                                                 <button
                                                     onClick={toggleFavourite}
-                                                    className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border ${isFavourited
-                                                        ? "bg-pink-500/20 text-pink-400 border-pink-500/30"
-                                                        : "bg-white/5 text-gray-400 border-white/10 hover:border-pink-500/30 hover:text-pink-400"
+                                                    className={`w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all border cursor-pointer ${isFavourited
+                                                        ? "bg-pink-50 text-pink-600 border-pink-200"
+                                                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-800"
                                                         }`}
                                                 >
                                                     <Heart className={`w-4 h-4 ${isFavourited ? "fill-current" : ""}`} />
@@ -427,7 +471,7 @@ export default function GameDetailPage() {
                                                 </button>
                                                 <button
                                                     onClick={handleShare}
-                                                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-white/5 text-gray-400 border border-white/10 hover:border-white/20 hover:text-white transition-all"
+                                                    className="w-full flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold bg-slate-50 text-slate-600 border border-slate-200 hover:bg-slate-100 hover:text-slate-800 transition-all cursor-pointer"
                                                 >
                                                     {shared ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
                                                     {shared ? "Link Copied!" : "Share Game"}
@@ -435,27 +479,27 @@ export default function GameDetailPage() {
                                                 {game.game_url && (
                                                     <button
                                                         onClick={handlePlay}
-                                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-lg shadow-purple-500/20 transition-all"
+                                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-sm transition-all cursor-pointer"
                                                     >
-                                                        <ExternalLink className="w-4 h-4" /> Open Game
+                                                        <ExternalLink className="w-4 h-4" /> Start Practice
                                                     </button>
                                                 )}
                                             </div>
                                         </div>
 
                                         {/* Star Rating card */}
-                                        <div className="bg-[#1a1d24] rounded-2xl p-5 border border-white/5">
-                                            <h2 className="text-sm font-bold text-white mb-1">Rate This Game</h2>
+                                        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                                            <h2 className="text-sm font-bold text-slate-800 mb-1">Rate This Game</h2>
                                             {/* Aggregate */}
                                             {ratingCount > 0 && (
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <div className="flex">
                                                         {[1, 2, 3, 4, 5].map(s => (
-                                                            <Star key={s} className={`w-3.5 h-3.5 ${s <= Math.round(avgRating) ? "text-yellow-400 fill-yellow-400" : "text-gray-600"}`} />
+                                                            <Star key={s} className={`w-3.5 h-3.5 ${s <= Math.round(avgRating) ? "text-yellow-400 fill-yellow-400" : "text-slate-300"}`} />
                                                         ))}
                                                     </div>
-                                                    <span className="text-xs font-bold text-yellow-400">{avgRating}</span>
-                                                    <span className="text-xs text-gray-500">({ratingCount} {ratingCount === 1 ? "rating" : "ratings"})</span>
+                                                    <span className="text-xs font-bold text-yellow-500">{avgRating}</span>
+                                                    <span className="text-xs text-slate-500">({ratingCount} {ratingCount === 1 ? "rating" : "ratings"})</span>
                                                 </div>
                                             )}
                                             {/* Interactive stars */}
@@ -467,27 +511,27 @@ export default function GameDetailPage() {
                                                         onClick={() => submitRating(star)}
                                                         onMouseEnter={() => setHoverRating(star)}
                                                         onMouseLeave={() => setHoverRating(0)}
-                                                        className="transition-transform hover:scale-125 disabled:cursor-not-allowed"
+                                                        className="transition-transform hover:scale-125 disabled:cursor-not-allowed cursor-pointer"
                                                     >
                                                         <Star
                                                             className={`w-7 h-7 transition-colors ${star <= (hoverRating || userRating)
                                                                 ? "text-yellow-400 fill-yellow-400"
-                                                                : "text-gray-600 hover:text-yellow-400"
+                                                                : "text-slate-300 hover:text-yellow-400"
                                                                 }`}
                                                         />
                                                     </button>
                                                 ))}
                                             </div>
                                             {ratingSuccess && (
-                                                <p className="text-xs text-emerald-400 flex items-center gap-1">
+                                                <p className="text-xs text-emerald-500 flex items-center gap-1 font-semibold">
                                                     <CheckCircle className="w-3.5 h-3.5" /> Rating saved!
                                                 </p>
                                             )}
                                             {!ratingSuccess && userRating > 0 && (
-                                                <p className="text-xs text-gray-500">Your rating: {userRating} star{userRating !== 1 ? "s" : ""}</p>
+                                                <p className="text-xs text-slate-500 font-medium">Your rating: {userRating} star{userRating !== 1 ? "s" : ""}</p>
                                             )}
                                             {!ratingSuccess && userRating === 0 && (
-                                                <p className="text-xs text-gray-600">Click a star to rate</p>
+                                                <p className="text-xs text-slate-400">Click a star to rate</p>
                                             )}
                                         </div>
                                     </div>

@@ -150,7 +150,7 @@ export default function GamerProfilePage() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center h-screen bg-[#0d0f14] text-white">
+            <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-900">
                 <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-purple-500"></div>
             </div>
         );
@@ -158,11 +158,11 @@ export default function GamerProfilePage() {
 
     if (!targetProfile) {
         return (
-            <div className="flex h-screen bg-[#0d0f14] items-center justify-center flex-col gap-4 text-white">
-                <Users className="w-16 h-16 text-gray-700" />
-                <p className="text-gray-400 text-lg font-semibold">Gamer not found</p>
-                <Link href="/dashboard/friends" className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-1">
-                    <ArrowLeft className="w-4 h-4" /> Back to Friends
+            <div className="flex h-screen bg-slate-50 items-center justify-center flex-col gap-4 text-slate-900">
+                <Users className="w-16 h-16 text-slate-300" />
+                <p className="text-slate-500 text-lg font-semibold">Gamer not found</p>
+                <Link href="/dashboard" className="text-purple-600 hover:text-purple-700 text-sm flex items-center gap-1">
+                    <ArrowLeft className="w-4 h-4" /> Back to Dashboard
                 </Link>
             </div>
         );
@@ -178,7 +178,7 @@ export default function GamerProfilePage() {
     const tInitials = tFullName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "G";
 
     return (
-        <div className="flex h-screen bg-[#0d0f14] text-white font-sans overflow-hidden">
+        <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
             {/* ── Sidebar ──────────────────────────────────────────────────────────── */}
             <Sidebar 
                 currentActiveId="home" 
@@ -191,37 +191,37 @@ export default function GamerProfilePage() {
                 <header className="absolute top-0 left-0 w-full h-16 z-20 flex items-center px-6 gap-3">
                     <button 
                         onClick={() => setIsSidebarOpen(true)}
-                        className="md:hidden p-2 -ml-2 text-gray-400 hover:text-white transition-colors bg-black/40 backdrop-blur-md rounded-full border border-white/10"
+                        className="md:hidden p-2 -ml-2 text-slate-600 hover:text-slate-950 transition-colors bg-white/80 backdrop-blur-md rounded-full border border-slate-200/50 shadow-sm"
                     >
                         <Menu className="w-5 h-5" />
                     </button>
-                    <Link href="/dashboard/friends" className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-black/60 transition">
+                    <Link href="/dashboard" className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md border border-slate-200/50 flex items-center justify-center text-slate-800 hover:bg-white hover:text-purple-600 transition shadow-sm">
                         <ArrowLeft className="w-5 h-5" />
                     </Link>
                 </header>
 
                 <main className="flex-1 overflow-y-auto">
                     {/* Hero Banner */}
-                    <div className="relative h-64 bg-gradient-to-br from-indigo-900/60 via-purple-900/40 to-black border-b border-white/5">
+                    <div className="relative h-64 bg-gradient-to-br from-purple-500/10 via-indigo-500/5 to-slate-50 border-b border-slate-200/80">
                         <div className="absolute inset-0 opacity-20 bg-[url('https://transparenttextures.com/patterns/cubes.png')] mix-blend-overlay"></div>
-                        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#0d0f14] to-transparent"></div>
+                        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-slate-50 to-transparent"></div>
                     </div>
 
                     <div className="max-w-4xl mx-auto px-6 pb-20 -mt-24 relative z-10 w-full">
                         <div className="flex flex-col md:flex-row gap-6 items-start md:items-end mb-8">
-                            <div className="w-40 h-40 rounded-3xl bg-[#1a1d24] border-4 border-[#0d0f14] flex items-center justify-center overflow-hidden shadow-2xl relative">
+                            <div className="w-40 h-40 rounded-3xl bg-white border-4 border-slate-50 flex items-center justify-center overflow-hidden shadow-xl relative">
                                 {targetProfile.avatar_url ? (
                                     <Image src={targetProfile.avatar_url} alt="" fill className="object-cover" />
                                 ) : (
-                                    <span className="text-5xl font-black bg-gradient-to-br from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                                    <span className="text-5xl font-black bg-gradient-to-br from-purple-600 to-indigo-600 bg-clip-text text-transparent">
                                         {tInitials}
                                     </span>
                                 )}
                             </div>
 
                             <div className="flex-1 min-w-0 pb-2">
-                                <h1 className="text-4xl font-black text-white leading-tight mb-2">{tFullName}</h1>
-                                <p className="text-purple-400 font-bold tracking-wide">@{targetProfile.username || "gamer"}</p>
+                                <h1 className="text-4xl font-black text-slate-900 leading-tight mb-2">{tFullName}</h1>
+                                <p className="text-purple-600 font-bold tracking-wide">@{targetProfile.username || "gamer"}</p>
                             </div>
 
                             {/* Friendship Actions */}
@@ -230,7 +230,7 @@ export default function GamerProfilePage() {
                                     <button
                                         onClick={() => handleAction('send')}
                                         disabled={actionLoading}
-                                        className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition disabled:opacity-50"
+                                        className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition disabled:opacity-50 shadow-sm"
                                     >
                                         <UserPlus className="w-5 h-5" /> Add Friend
                                     </button>
@@ -240,7 +240,7 @@ export default function GamerProfilePage() {
                                     <button
                                         onClick={() => handleAction('remove')}
                                         disabled={actionLoading}
-                                        className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:border-red-500/30 hover:bg-red-500/10 text-gray-300 hover:text-red-400 px-6 py-3 rounded-xl font-bold transition disabled:opacity-50"
+                                        className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-red-200 hover:bg-red-50 text-slate-600 hover:text-red-600 px-6 py-3 rounded-xl font-bold transition disabled:opacity-50 shadow-sm"
                                     >
                                         <XCircle className="w-5 h-5" /> Cancel Request
                                     </button>
@@ -251,14 +251,14 @@ export default function GamerProfilePage() {
                                         <button
                                             onClick={() => handleAction('accept')}
                                             disabled={actionLoading}
-                                            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold transition disabled:opacity-50"
+                                            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-xl font-bold transition disabled:opacity-50 shadow-sm"
                                         >
                                             <CheckCircle className="w-5 h-5" /> Accept
                                         </button>
                                         <button
                                             onClick={() => handleAction('decline')}
                                             disabled={actionLoading}
-                                            className="flex-shrink-0 flex items-center justify-center w-12 h-12 bg-white/5 border border-white/10 hover:border-red-500/30 hover:bg-red-500/10 text-gray-300 hover:text-red-400 rounded-xl transition disabled:opacity-50"
+                                            className="flex-shrink-0 flex items-center justify-center w-12 h-12 bg-white border border-slate-200 hover:border-red-200 hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-xl transition disabled:opacity-50 shadow-sm"
                                         >
                                             <XCircle className="w-5 h-5" />
                                         </button>
@@ -269,7 +269,7 @@ export default function GamerProfilePage() {
                                     <button
                                         onClick={() => confirm("Are you sure you want to remove this friend?") && handleAction('remove')}
                                         disabled={actionLoading}
-                                        className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white/5 border border-white/10 hover:border-red-500/30 hover:bg-red-500/10 text-emerald-400 hover:text-red-400 px-6 py-3 rounded-xl font-bold transition disabled:opacity-50 group"
+                                        className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-slate-200 hover:border-red-200 hover:bg-red-50 text-emerald-600 hover:text-red-600 px-6 py-3 rounded-xl font-bold transition disabled:opacity-50 group shadow-sm"
                                     >
                                         <div className="group-hover:hidden flex items-center gap-2">
                                             <UserCheck className="w-5 h-5" /> Friends
@@ -284,47 +284,47 @@ export default function GamerProfilePage() {
 
                         {/* Details Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="bg-[#1a1d24] border border-white/5 rounded-2xl p-6">
-                                <h3 className="text-gray-400 font-bold text-xs uppercase tracking-wider mb-4">Gamer Profile</h3>
+                            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-sm">
+                                <h3 className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-4">Gamer Profile</h3>
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400">
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
                                             <MapPin className="w-4 h-4" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Origin</p>
-                                            <p className="text-sm font-medium text-white">{targetProfile.location || "Unknown Realm"}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Origin</p>
+                                            <p className="text-sm font-medium text-slate-800">{targetProfile.location || "Unknown Realm"}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-gray-400">
+                                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
                                             <Calendar className="w-4 h-4" />
                                         </div>
                                         <div>
-                                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Joined</p>
-                                            <p className="text-sm font-medium text-white">{new Date(targetProfile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Joined</p>
+                                            <p className="text-sm font-medium text-slate-800">{new Date(targetProfile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="bg-[#1a1d24] border border-white/5 rounded-2xl p-6 md:col-span-2">
-                                <h3 className="text-gray-400 font-bold text-xs uppercase tracking-wider mb-4">Activity Stats</h3>
+                            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 md:col-span-2 shadow-sm">
+                                <h3 className="text-slate-400 font-bold text-xs uppercase tracking-wider mb-4">Activity Stats</h3>
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                    <div className="bg-black/30 rounded-xl p-4 border border-white/5">
-                                        <Zap className="w-5 h-5 text-yellow-400 mb-2" />
-                                        <p className="text-2xl font-black text-white">0</p>
-                                        <p className="text-[10px] text-gray-500 font-bold uppercase">Games Played</p>
+                                    <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
+                                        <Zap className="w-5 h-5 text-yellow-500 mb-2" />
+                                        <p className="text-2xl font-black text-slate-800">0</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Games Played</p>
                                     </div>
-                                    <div className="bg-black/30 rounded-xl p-4 border border-white/5">
-                                        <Star className="w-5 h-5 text-purple-400 mb-2" />
-                                        <p className="text-2xl font-black text-white">{stats.reviews}</p>
-                                        <p className="text-[10px] text-gray-500 font-bold uppercase">Games Rated</p>
+                                    <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
+                                        <Star className="w-5 h-5 text-purple-500 mb-2" />
+                                        <p className="text-2xl font-black text-slate-800">{stats.reviews}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Games Rated</p>
                                     </div>
-                                    <div className="bg-black/30 rounded-xl p-4 border border-white/5">
-                                        <Trophy className="w-5 h-5 text-emerald-400 mb-2" />
-                                        <p className="text-2xl font-black text-white">0</p>
-                                        <p className="text-[10px] text-gray-500 font-bold uppercase">Achievements</p>
+                                    <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100">
+                                        <Trophy className="w-5 h-5 text-emerald-500 mb-2" />
+                                        <p className="text-2xl font-black text-slate-800">0</p>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">Achievements</p>
                                     </div>
                                 </div>
                             </div>

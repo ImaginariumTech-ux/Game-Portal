@@ -122,29 +122,29 @@ export default function CollectionDetailPage() {
     const initials = fullName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "G";
 
     return (
-        <div className="flex h-screen bg-[#0d0f14] text-white font-sans overflow-hidden">
+        <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
             <Sidebar currentActiveId="collections" />
 
             <div className="flex-1 flex flex-col overflow-hidden">
-                <header className="h-12 flex-shrink-0 bg-[#111318] border-b border-white/5 flex items-center px-4 gap-3">
-                    <div className="flex items-center gap-2 bg-[#1a1d24] border border-white/5 rounded-full px-3 py-1.5">
+                <header className="h-12 flex-shrink-0 bg-white border-b border-slate-200 flex items-center px-4 gap-3">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
                         <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
                             <span className="text-[8px] font-black text-white">M</span>
                         </div>
-                        <span className="text-sm font-bold text-white">1,022.00</span>
+                        <span className="text-sm font-bold text-slate-800">1,022.00</span>
                     </div>
                 </header>
 
                 <main className="flex-1 overflow-y-auto">
                     {loading ? (
                         <div className="flex items-center justify-center h-full">
-                            <span className="text-gray-500 animate-pulse">Loading collection...</span>
+                            <span className="text-slate-500 animate-pulse">Loading collection...</span>
                         </div>
                     ) : !collection ? (
                         <div className="flex flex-col items-center justify-center h-full gap-4">
-                            <Folder className="w-16 h-16 text-gray-700" />
-                            <p className="text-gray-400">Collection not found</p>
-                            <Link href="/dashboard/collections" className="text-purple-400 hover:text-purple-300 text-sm flex items-center gap-1">
+                            <Folder className="w-16 h-16 text-slate-300" />
+                            <p className="text-slate-500">Collection not found</p>
+                            <Link href="/dashboard/collections" className="text-purple-600 hover:text-purple-700 text-sm font-semibold flex items-center gap-1">
                                 <ArrowLeft className="w-4 h-4" /> Back to Collections
                             </Link>
                         </div>
@@ -161,22 +161,22 @@ export default function CollectionDetailPage() {
                                 ) : (
                                     <div className="absolute inset-0 bg-gradient-to-r from-purple-900 via-indigo-900 to-blue-900 opacity-60" />
                                 )}
-                                <div className="absolute inset-0 bg-gradient-to-t from-[#0d0f14] via-transparent to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-transparent to-transparent" />
 
                                 <div className="absolute top-4 left-4 z-10">
                                     <Link
                                         href="/dashboard/collections"
-                                        className="flex items-center gap-2 text-white/70 hover:text-white text-sm font-medium bg-black/30 backdrop-blur-sm px-3 py-1.5 rounded-full transition-all hover:bg-black/50"
+                                        className="flex items-center gap-2 text-slate-800 hover:text-slate-950 text-sm font-semibold bg-white/60 backdrop-blur-sm px-3 py-1.5 rounded-full transition-all hover:bg-white/80 border border-slate-200/50 shadow-sm"
                                     >
                                         <ArrowLeft className="w-4 h-4" /> Back to Collections
                                     </Link>
                                 </div>
 
                                 <div className="absolute bottom-0 left-0 p-8 z-10 w-full max-w-4xl">
-                                    <h1 className="text-4xl font-black text-white mb-2 leading-tight drop-shadow-lg">{collection.name}</h1>
-                                    <p className="text-gray-200 text-sm max-w-2xl drop-shadow-md">{collection.description}</p>
+                                    <h1 className="text-4xl font-black text-slate-900 mb-2 leading-tight drop-shadow-sm">{collection.name}</h1>
+                                    <p className="text-slate-700 text-sm max-w-2xl">{collection.description}</p>
                                     <div className="mt-4 flex items-center gap-3">
-                                        <span className="px-3 py-1 rounded-full bg-white/10 text-xs font-bold border border-white/20 backdrop-blur-md">
+                                        <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-750 text-xs font-bold border border-purple-200/55 backdrop-blur-md shadow-sm">
                                             {games.length} Games
                                         </span>
                                     </div>
@@ -184,14 +184,14 @@ export default function CollectionDetailPage() {
                             </div>
 
                             <div className="p-8">
-                                <h2 className="text-xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 bg-clip-text text-transparent mb-6 flex items-center gap-2">
-                                    <Gamepad2 className="w-5 h-5 text-purple-400" />
+                                <h2 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent mb-6 flex items-center gap-2">
+                                    <Gamepad2 className="w-5 h-5 text-purple-600" />
                                     Review Games in this Collection
                                 </h2>
 
                                 {games.length === 0 ? (
-                                    <div className="py-20 text-center border border-white/5 rounded-2xl bg-white/5">
-                                        <p className="text-gray-500">No games in this collection yet.</p>
+                                    <div className="py-20 text-center border border-slate-200 rounded-2xl bg-white p-8 shadow-sm">
+                                        <p className="text-slate-400">No games in this collection yet.</p>
                                     </div>
                                 ) : (
                                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
@@ -199,32 +199,32 @@ export default function CollectionDetailPage() {
                                             <div
                                                 key={game.id}
                                                 onClick={() => router.push(`/dashboard/games/${game.id}`)}
-                                                className="bg-white/5 border border-white/10 rounded-xl overflow-hidden group hover:border-purple-500/30 transition-all cursor-pointer hover:shadow-lg hover:shadow-purple-500/10"
+                                                className="bg-white border border-slate-200 rounded-xl overflow-hidden group hover:border-purple-300 transition-all cursor-pointer hover:shadow-md hover:-translate-y-1"
                                             >
-                                                <div className="h-32 relative bg-black/50">
+                                                <div className="h-32 relative bg-slate-100">
                                                     {game.thumbnail_url ? (
                                                         <Image src={game.thumbnail_url} alt={game.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
                                                     ) : (
                                                         <div className="absolute inset-0 flex items-center justify-center">
-                                                            <Gamepad2 className="w-8 h-8 text-white/20" />
+                                                            <Gamepad2 className="w-8 h-8 text-purple-600/20" />
                                                         </div>
                                                     )}
 
                                                     {game.avg_rating && game.avg_rating > 0 ? (
-                                                        <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 z-10">
-                                                            <Star className="w-2.5 h-2.5 text-yellow-400 fill-yellow-400" />
+                                                        <div className="absolute top-2 left-2 bg-white/85 backdrop-blur-sm text-slate-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1 z-10 border border-slate-200/50 shadow-sm">
+                                                            <Star className="w-2.5 h-2.5 text-yellow-500 fill-yellow-500" />
                                                             {game.avg_rating.toFixed(1)}
                                                         </div>
                                                     ) : null}
 
-                                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
-                                                        <span className="bg-white text-black text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-lg transform translate-y-2 group-hover:translate-y-0 transition-transform">
+                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-[1px]">
+                                                        <span className="bg-purple-600 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1 shadow-md transform translate-y-2 group-hover:translate-y-0 transition-transform">
                                                             <ExternalLink className="w-3 h-3" /> View Details
                                                         </span>
                                                     </div>
                                                 </div>
                                                 <div className="p-4">
-                                                    <h3 className="font-bold text-white truncate group-hover:text-purple-300 transition-colors">{game.title}</h3>
+                                                    <h3 className="font-bold text-slate-800 truncate group-hover:text-purple-600 transition-colors text-sm">{game.title}</h3>
                                                 </div>
                                             </div>
                                         ))}

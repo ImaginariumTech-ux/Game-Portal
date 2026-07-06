@@ -70,6 +70,61 @@ export async function POST(req: Request) {
     // 3. Log success and return data
     console.log(`Match ${roomId} completed successfully:`, data);
 
+    // 4. Record tournament leaderboard score if room is linked to a tournament
+    try {
+      const { data: roomData } = await supabaseAdmin
+        .from('game_rooms')
+        .select('tournament_id')
+        .eq('id', roomId)
+        .maybeSingle();
+
+      if (roomData && roomData.tournament_id) {
+        console.log(`Recording tournament scores for tournament ${roomData.tournament_id}...`);
+        for (const playerResult of results) {
+          const { userId, score } = playerResult;
+          if (!userId) continue;
+
+          // Check for existing score
+          const { data: existingEntry, error: fetchErr } = await supabaseAdmin
+            .from('tournament_leaderboard')
+            .select('id, score')
+            .eq('tournament_id', roomData.tournament_id)
+            .eq('user_id', userId)
+            .maybeSingle();
+
+          if (fetchErr) {
+            console.error('Error fetching existing tournament entry:', fetchErr);
+            continue;
+          }
+
+          if (existingEntry) {
+            // Only update if the new score is higher
+            if (Number(score) > Number(existingEntry.score)) {
+              console.log(`Updating high score for user ${userId}: ${score} (old: ${existingEntry.score})`);
+              await supabaseAdmin
+                .from('tournament_leaderboard')
+                .update({
+                  score: Number(score),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingEntry.id);
+            }
+          } else {
+            console.log(`Inserting initial tournament score for user ${userId}: ${score}`);
+            await supabaseAdmin
+              .from('tournament_leaderboard')
+              .insert({
+                tournament_id: roomData.tournament_id,
+                user_id: userId,
+                score: Number(score)
+              });
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error handling tournament leaderboard update:', err);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Match results processed and payouts distributed',
