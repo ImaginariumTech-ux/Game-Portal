@@ -12,6 +12,7 @@ import {
     ChevronDown, ChevronUp
 } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
+import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 import { usePresence } from "@/hooks/usePresence";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -313,14 +314,7 @@ export default function UserDashboard() {
     const displayedGames = activeTab === "TOP" ? topRatedGames : activeTab === "FAV" ? favouriteGames : filteredGames;
 
     if (loading) {
-        return (
-            <div className="flex h-screen w-full items-center justify-center bg-slate-50 text-slate-900">
-                <div className="flex flex-col items-center gap-3">
-                    <Sparkles className="w-8 h-8 animate-spin text-purple-600" />
-                    <p className="text-sm text-slate-500">Loading your adventure...</p>
-                </div>
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
     return (

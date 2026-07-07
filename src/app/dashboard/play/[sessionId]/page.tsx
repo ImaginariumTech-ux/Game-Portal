@@ -217,9 +217,22 @@ export default function GamePlayPage() {
 
     if (loading) {
         return (
-            <div className="flex h-screen w-full flex-col items-center justify-center bg-slate-50 text-slate-900">
-                <Loader2 className="w-8 h-8 text-purple-500 animate-spin mb-4" />
-                <p className="text-sm text-slate-500">Preparing game session...</p>
+            <div className="flex h-screen flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden">
+                {/* Top header skeleton */}
+                <div className="h-14 bg-white border-b border-slate-200 flex items-center px-6 justify-between shrink-0">
+                    <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-slate-200 animate-pulse" />
+                        <div className="w-32 h-5 bg-slate-200 rounded animate-pulse" />
+                    </div>
+                    <div className="w-20 h-4 bg-slate-200 rounded animate-pulse" />
+                </div>
+                {/* Immersive Game canvas skeleton placeholder */}
+                <div className="flex-grow p-4 md:p-8 flex items-center justify-center">
+                    <div className="w-full max-w-4xl aspect-[4/3] max-h-[80vh] bg-slate-200/80 rounded-3xl animate-pulse shadow-md flex flex-col items-center justify-center gap-3">
+                        <Gamepad2 className="w-12 h-12 text-slate-300 animate-bounce" />
+                        <p className="text-sm font-semibold text-slate-400">Preparing game session...</p>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -237,7 +250,7 @@ export default function GamePlayPage() {
 
     if (!session || !session.game) return null;
 
-    const gameUrl = session.game.game_url;
+    const gameUrl = (session.game.game_url || "").trim();
     const separator = gameUrl.includes("?") ? "&" : "?";
     // We send sessionId=sessionId and sessionToken=JWT to ensure compliance
     const finalUrl = `${gameUrl}${separator}sessionId=${sessionId}&sessionToken=${session.session_token}`;

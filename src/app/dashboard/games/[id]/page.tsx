@@ -13,6 +13,7 @@ import {
     MapPin, CheckCircle
 } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
+import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 
 interface Game {
     id: string;
@@ -219,11 +220,7 @@ export default function GameDetailPage() {
     const initials = fullName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "G";
 
     if (loading) {
-        return (
-            <div className="flex h-screen bg-slate-50 text-slate-900 items-center justify-center">
-                <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
     if (notFound) {

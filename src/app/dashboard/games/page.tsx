@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import Sidebar from "@/components/dashboard/Sidebar";
+import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 
 interface Game {
     id: string;
@@ -122,7 +123,9 @@ export default function GamesPage() {
         return matchesSearch && matchesCollection && matchesTab;
     });
 
-    const initials = fullName.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "G";
+    if (loading) {
+        return <DashboardSkeleton />;
+    }
 
     return (
         <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
@@ -232,15 +235,8 @@ export default function GamesPage() {
                         {search && <span>for "<span className="text-purple-600 font-semibold">{search}</span>"</span>}
                     </div>
 
-                    {/* Loading */}
-                    {loading && (
-                        <div className="flex items-center justify-center h-48">
-                            <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
-                        </div>
-                    )}
-
                     {/* Empty */}
-                    {!loading && filtered.length === 0 && (
+                    {filtered.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-64 text-center bg-white border border-slate-200 rounded-2xl shadow-sm p-8">
                             {activeTab === "mine" ? (
                                 <>

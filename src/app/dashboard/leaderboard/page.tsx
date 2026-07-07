@@ -18,6 +18,7 @@ import {
     Sparkles
 } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
+import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 
 interface Game {
     id: string;
@@ -120,11 +121,7 @@ export default function TournamentsPage() {
     };
 
     if (loading) {
-        return (
-            <div className="flex h-screen bg-slate-50 items-center justify-center">
-                <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
     return (

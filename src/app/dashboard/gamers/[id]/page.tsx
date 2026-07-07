@@ -11,6 +11,7 @@ import {
     UserMinus, UserCheck, Calendar, MapPin, Sparkles, Zap, Bell, Wallet, Star, Menu
 } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
+import DashboardSkeleton from "@/components/dashboard/DashboardSkeleton";
 
 interface Profile {
     id: string;
@@ -149,11 +150,7 @@ export default function GamerProfilePage() {
     };
 
     if (loading) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-slate-50 text-slate-900">
-                <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-purple-500"></div>
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
     if (!targetProfile) {
