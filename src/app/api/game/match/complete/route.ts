@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 
-// Initialize Supabase with Service Role Key for internal administrative tasks
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -15,120 +15,106 @@ const supabaseAdmin = createClient(
 
 /**
  * API Endpoint: POST /api/game/match/complete
- * Description: Finalizes a match, updates rankings, and processes coin payouts.
- * Body: { roomId: string, results: Array<{ userId: string, rank: number, score: number }> }
+ * Description: Called by game servers to finalize a single-player match session.
+ * Body: { sessionId: string, score: number }
+ * Headers: X-Portal-Signature (HMAC-SHA256 of raw request body signed with game's webhook_secret)
  */
 export async function POST(req: Request) {
   try {
-    // Handle OPTIONS for CORS
+    // 1. OPTIONS preflight
     if (req.method === 'OPTIONS') {
       return new Response(null, {
         headers: {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          'Access-Control-Allow-Headers': 'Content-Type, X-Portal-Signature',
         },
       });
     }
 
-    const body = await req.json();
-    const { roomId, results } = body;
-
-    // 1. Basic Validation
-    if (!roomId || !results || !Array.isArray(results)) {
-      return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    const bodyText = await req.text();
+    let body: any;
+    try {
+      body = JSON.parse(bodyText);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    // TODO: Add Signature/Secret Verification here to ensure the request comes from a trusted game server
-    // const authHeader = req.headers.get('Authorization');
-    // if (authHeader !== `Bearer ${process.env.GAME_API_SECRET}`) { ... }
+    const { sessionId, score } = body;
 
-    console.log(`Processing match completion for room ${roomId}...`);
+    if (!sessionId || score === undefined) {
+      return NextResponse.json({ error: 'Missing sessionId or score' }, { status: 400 });
+    }
 
-    // 2. Call the Atomic Payout RPC function
-    const { data, error } = await supabaseAdmin.rpc('process_game_payout', {
-      p_room_id: roomId,
-      p_results: results
+    // 2. Fetch Session and Game Webhook Secret
+    const { data: session, error: sessionErr } = await supabaseAdmin
+      .from('game_sessions')
+      .select(`
+        id, status, score, is_personal_best, best_score,
+        game:games(webhook_secret)
+      `)
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (sessionErr || !session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    // 3. Idempotency Guard: if already completed, return existing results
+    if (session.status === 'completed') {
+      return NextResponse.json({
+        success: true,
+        message: 'Session already completed (idempotent)',
+        score: session.score,
+        is_personal_best: session.is_personal_best ?? false,
+        best_score: session.best_score ?? session.score
+      }, {
+        headers: { 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+
+    const game = Array.isArray(session.game) ? session.game[0] : session.game;
+    const webhookSecret = (game as any)?.webhook_secret;
+
+    if (!webhookSecret) {
+      return NextResponse.json({ error: 'Game webhook secret is not configured' }, { status: 500 });
+    }
+
+    // 4. Verify Signature (HMAC-SHA256)
+    const signature = req.headers.get('x-portal-signature') || req.headers.get('X-Portal-Signature');
+    if (!signature) {
+      return NextResponse.json({ error: 'Missing X-Portal-Signature header' }, { status: 401 });
+    }
+
+    const expectedSignature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(bodyText)
+      .digest('hex');
+
+    if (signature !== expectedSignature) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+
+    // 5. Invoke Database RPC to update score and leaderboard
+    const { data: scoreData, error: rpcErr } = await supabaseAdmin.rpc('upsert_tournament_score', {
+      p_session_id: sessionId,
+      p_score: Number(score)
     });
 
-    if (error) {
-      console.error('RPC Error processing payout:', error);
-      return NextResponse.json({ 
-        success: false, 
-        error: error.message,
-        details: error.details 
-      }, { status: 500 });
+    if (rpcErr) {
+      console.error('Error invoking upsert_tournament_score:', rpcErr);
+      return NextResponse.json({ error: 'Failed to update score', details: rpcErr.message }, { status: 500 });
     }
 
-    if (!data.success) {
-      return NextResponse.json({ 
-        success: false, 
-        error: data.error 
-      }, { status: 400 });
-    }
-
-    // 3. Log success and return data
-    console.log(`Match ${roomId} completed successfully:`, data);
-
-    // 4. Record tournament leaderboard score if room is linked to a tournament
-    try {
-      const { data: roomData } = await supabaseAdmin
-        .from('game_rooms')
-        .select('tournament_id')
-        .eq('id', roomId)
-        .maybeSingle();
-
-      if (roomData && roomData.tournament_id) {
-        console.log(`Recording tournament scores for tournament ${roomData.tournament_id}...`);
-        for (const playerResult of results) {
-          const { userId, score } = playerResult;
-          if (!userId) continue;
-
-          // Check for existing score
-          const { data: existingEntry, error: fetchErr } = await supabaseAdmin
-            .from('tournament_leaderboard')
-            .select('id, score')
-            .eq('tournament_id', roomData.tournament_id)
-            .eq('user_id', userId)
-            .maybeSingle();
-
-          if (fetchErr) {
-            console.error('Error fetching existing tournament entry:', fetchErr);
-            continue;
-          }
-
-          if (existingEntry) {
-            // Only update if the new score is higher
-            if (Number(score) > Number(existingEntry.score)) {
-              console.log(`Updating high score for user ${userId}: ${score} (old: ${existingEntry.score})`);
-              await supabaseAdmin
-                .from('tournament_leaderboard')
-                .update({
-                  score: Number(score),
-                  updated_at: new Date().toISOString()
-                })
-                .eq('id', existingEntry.id);
-            }
-          } else {
-            console.log(`Inserting initial tournament score for user ${userId}: ${score}`);
-            await supabaseAdmin
-              .from('tournament_leaderboard')
-              .insert({
-                tournament_id: roomData.tournament_id,
-                user_id: userId,
-                score: Number(score)
-              });
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error handling tournament leaderboard update:', err);
-    }
+    const resultRecord = (scoreData && scoreData.length > 0) ? scoreData[0] : null;
+    const isPersonalBest = resultRecord ? resultRecord.is_personal_best : false;
+    const bestScore = resultRecord ? resultRecord.best_score : Number(score);
 
     return NextResponse.json({
       success: true,
-      message: 'Match results processed and payouts distributed',
-      data
+      message: 'Score submitted successfully',
+      is_personal_best: isPersonalBest,
+      best_score: bestScore
     }, {
       headers: {
         'Access-Control-Allow-Origin': '*',
@@ -137,9 +123,20 @@ export async function POST(req: Request) {
 
   } catch (err: any) {
     console.error('Fatal error in match/complete:', err);
-    return NextResponse.json({ 
-      error: 'Internal server error', 
-      message: err.message 
+    return NextResponse.json({
+      error: 'Internal server error',
+      message: err.message
     }, { status: 500 });
   }
+}
+
+// OPTIONS handler for CORS preflight
+export async function OPTIONS() {
+  return new Response(null, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Portal-Signature',
+    },
+  });
 }

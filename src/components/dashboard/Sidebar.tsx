@@ -31,7 +31,6 @@ export default function Sidebar({ onNavItemClick, currentActiveId, isOpen, onClo
     const [user, setUser] = useState<any>(null);
     const [profile, setProfile] = useState<any>(null);
     const [friends, setFriends] = useState<any[]>([]);
-    const [inviteCount, setInviteCount] = useState(0);
 
     useEffect(() => {
         const fetchProfile = async () => {
@@ -61,34 +60,6 @@ export default function Sidebar({ onNavItemClick, currentActiveId, isOpen, onClo
                     return isMeUser ? f.friend_id : f.user_id;
                 });
                 setFriends(formatted);
-
-                // Initial invite count
-                const { count } = await supabase
-                    .from("room_invites")
-                    .select("*", { count: "exact", head: true })
-                    .eq("invitee_id", user.id)
-                    .eq("status", "pending");
-                setInviteCount(count || 0);
-
-                // Subscribe to new invites
-                const channel = supabase
-                    .channel(`sidebar-invites-${user.id}`)
-                    .on("postgres_changes", {
-                        event: "*",
-                        schema: "public",
-                        table: "room_invites",
-                        filter: `invitee_id=eq.${user.id}`,
-                    }, async () => {
-                        const { count } = await supabase
-                            .from("room_invites")
-                            .select("*", { count: "exact", head: true })
-                            .eq("invitee_id", user.id)
-                            .eq("status", "pending");
-                        setInviteCount(count || 0);
-                    })
-                    .subscribe();
-
-                return () => { supabase.removeChannel(channel); };
             }
         };
         fetchProfile();
@@ -188,6 +159,7 @@ export default function Sidebar({ onNavItemClick, currentActiveId, isOpen, onClo
                         )}
                     </div>
                 </div>
+
             </div>
 
             {/* Nav */}
@@ -214,12 +186,6 @@ export default function Sidebar({ onNavItemClick, currentActiveId, isOpen, onClo
                             <span className="ml-auto flex items-center gap-1 bg-green-50 text-green-700 text-[8px] font-bold px-1.5 py-0.5 rounded-full border border-green-200/50">
                                 <span className="w-1 h-1 rounded-full bg-green-500 animate-pulse" />
                                 {onlineFriendsCount}
-                            </span>
-                        )}
-                        {/* Live invite badge on Game Room nav item */}
-                        {item.id === "gameroom" && inviteCount > 0 && (
-                            <span className="ml-auto flex items-center justify-center w-4 h-4 bg-amber-500 text-white text-[10px] font-black rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)] animate-bounce">
-                                {inviteCount}
                             </span>
                         )}
                     </button>

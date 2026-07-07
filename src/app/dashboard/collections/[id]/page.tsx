@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import Image from "next/image";
 import Link from "next/link";
 import {
-    Sparkles, Search, Bell, Wallet, Home, Gamepad2, Users,
+    Sparkles, Search, Bell, Home, Gamepad2, Users,
     HelpCircle, BarChart3, LogOut, Folder, MapPin, Calendar, Zap, LayoutGrid, ArrowLeft, Star, Play, ExternalLink,
     DoorOpen, Trophy
 } from "lucide-react";
@@ -127,12 +127,7 @@ export default function CollectionDetailPage() {
 
             <div className="flex-1 flex flex-col overflow-hidden">
                 <header className="h-12 flex-shrink-0 bg-white border-b border-slate-200 flex items-center px-4 gap-3">
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
-                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
-                            <span className="text-[8px] font-black text-white">M</span>
-                        </div>
-                        <span className="text-sm font-bold text-slate-800">1,022.00</span>
-                    </div>
+
                 </header>
 
                 <main className="flex-1 overflow-y-auto">

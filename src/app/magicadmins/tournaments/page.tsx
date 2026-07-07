@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import {
     Plus,
     Trash2,
@@ -14,7 +15,8 @@ import {
     AlertCircle,
     X,
     ChevronRight,
-    Search
+    Search,
+    Users2
 } from "lucide-react";
 import AdminSidebar from "@/components/AdminSidebar";
 import toast, { Toaster } from "react-hot-toast";
@@ -22,6 +24,8 @@ import toast, { Toaster } from "react-hot-toast";
 interface Game {
     id: string;
     title: string;
+    thumbnail_url?: string | null;
+    game_image_url?: string | null;
 }
 
 interface Tournament {
@@ -29,17 +33,16 @@ interface Tournament {
     title: string;
     description: string | null;
     game_id: string;
-    start_date: string;
-    end_date: string;
-    is_active: boolean;
+    start_at: string;
+    end_at: string;
+    status: string;
     created_at: string;
     game?: Game;
 }
 
 interface LeaderboardEntry {
-    id: string;
     user_id: string;
-    score: number;
+    high_score: number;
     updated_at: string;
     profile?: {
         full_name: string;
@@ -49,22 +52,14 @@ interface LeaderboardEntry {
 }
 
 export default function AdminTournamentsPage() {
+    const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
-    const [games, setGames] = useState<Game[]>([]);
     const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
     const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
     const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
-    // Form state
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [title, setTitle] = useState("");
-    const [description, setDescription] = useState("");
-    const [gameId, setGameId] = useState("");
-    const [startDate, setStartDate] = useState("");
-    const [endDate, setEndDate] = useState("");
-    const [isActive, setIsActive] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+    const [adminTab, setAdminTab] = useState<"leaderboard">("leaderboard");
 
     useEffect(() => {
         fetchInitialData();
@@ -73,15 +68,7 @@ export default function AdminTournamentsPage() {
     const fetchInitialData = async () => {
         try {
             setLoading(true);
-            // 1. Fetch published games for the dropdown
-            const { data: gamesData } = await supabase
-                .from("games")
-                .select("id, title")
-                .eq("status", "published")
-                .order("title");
-            setGames(gamesData || []);
-
-            // 2. Fetch all tournaments
+            // Fetch all tournaments
             await fetchTournaments();
         } catch (err) {
             console.error("Error fetching initial admin data:", err);
@@ -96,7 +83,7 @@ export default function AdminTournamentsPage() {
             .from("tournaments")
             .select(`
                 *,
-                game:games(id, title)
+                game:games(id, title, thumbnail_url, game_image_url)
             `)
             .order("created_at", { ascending: false });
 
@@ -128,11 +115,11 @@ export default function AdminTournamentsPage() {
             const { data, error } = await supabase
                 .from("tournament_leaderboard")
                 .select(`
-                    id, user_id, score, updated_at,
+                    user_id, high_score, updated_at,
                     profile:profiles(full_name, username, avatar_url)
                 `)
                 .eq("tournament_id", tournamentId)
-                .order("score", { ascending: false });
+                .order("high_score", { ascending: false });
 
             if (error) throw error;
             
@@ -154,54 +141,57 @@ export default function AdminTournamentsPage() {
         fetchLeaderboard(t.id);
     };
 
-    const handleCreateTournament = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!title || !gameId || !startDate || !endDate) {
-            toast.error("Please fill in all required fields");
-            return;
-        }
-
-        setSubmitting(true);
+    const handleStartTournament = async () => {
+        if (!selectedTournament) return;
         try {
             const { data, error } = await supabase
                 .from("tournaments")
-                .insert({
-                    title,
-                    description: description || null,
-                    game_id: gameId,
-                    start_date: new Date(startDate).toISOString(),
-                    end_date: new Date(endDate).toISOString(),
-                    is_active: isActive
+                .update({ 
+                    status: 'active',
+                    start_at: new Date().toISOString() 
                 })
+                .eq("id", selectedTournament.id)
                 .select()
                 .single();
 
             if (error) throw error;
-
-            toast.success("Tournament created successfully!");
-            setShowCreateModal(false);
-            
-            // Reset form
-            setTitle("");
-            setDescription("");
-            setGameId("");
-            setStartDate("");
-            setEndDate("");
-            setIsActive(true);
-
-            // Refresh list and select the new tournament
+            toast.success("Tournament started successfully!");
             await fetchTournaments();
             if (data) {
-                setSelectedTournament(data);
-                fetchLeaderboard(data.id);
+                setSelectedTournament(data as Tournament);
             }
         } catch (err: any) {
-            console.error("Error creating tournament:", err);
-            toast.error(err.message || "Failed to create tournament");
-        } finally {
-            setSubmitting(false);
+            console.error("Error starting tournament:", err);
+            toast.error(err.message || "Failed to start tournament");
         }
     };
+
+    const handleEndTournament = async () => {
+        if (!selectedTournament) return;
+        try {
+            const { data, error } = await supabase
+                .from("tournaments")
+                .update({ 
+                    status: 'ended',
+                    end_at: new Date().toISOString() 
+                })
+                .eq("id", selectedTournament.id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            toast.success("Tournament ended successfully!");
+            await fetchTournaments();
+            if (data) {
+                setSelectedTournament(data as Tournament);
+            }
+        } catch (err: any) {
+            console.error("Error ending tournament:", err);
+            toast.error(err.message || "Failed to end tournament");
+        }
+    };
+
+    // Creation logic removed (handled by separate creation page)
 
     const handleDeleteTournament = async (id: string) => {
         if (!confirm("Are you sure you want to delete this tournament? This will permanently erase the tournament and all of its leaderboard entry scores.")) {
@@ -227,14 +217,13 @@ export default function AdminTournamentsPage() {
     };
 
     const getTournamentStatus = (t: Tournament) => {
-        const now = new Date();
-        const start = new Date(t.start_date);
-        const end = new Date(t.end_date);
-
-        if (!t.is_active) return { label: "Disabled", color: "bg-red-500/20 text-red-400 border-red-500/30" };
-        if (now < start) return { label: "Upcoming", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
-        if (now > end) return { label: "Ended", color: "bg-gray-500/20 text-gray-400 border-gray-500/30" };
-        return { label: "Active", color: "bg-green-500/20 text-green-400 border-green-500/30" };
+        if (t.status === 'active') {
+            return { label: "Active", color: "bg-green-500/20 text-green-400 border-green-500/30" };
+        } else if (t.status === 'ended') {
+            return { label: "Ended", color: "bg-gray-500/20 text-gray-400 border-gray-500/30" };
+        } else {
+            return { label: "Upcoming", color: "bg-blue-500/20 text-blue-400 border-blue-500/30" };
+        }
     };
 
     return (
@@ -253,7 +242,7 @@ export default function AdminTournamentsPage() {
                     </div>
 
                     <button
-                        onClick={() => setShowCreateModal(true)}
+                        onClick={() => router.push("/magicadmins/tournaments/create")}
                         className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-purple-500/20 transition-all hover:-translate-y-0.5 active:translate-y-0"
                     >
                         <Plus className="w-4 h-4" /> Create Tournament
@@ -280,7 +269,7 @@ export default function AdminTournamentsPage() {
                                         <Trophy className="w-12 h-12 text-gray-700 mx-auto mb-4" />
                                         No tournaments created yet.
                                         <button
-                                            onClick={() => setShowCreateModal(true)}
+                                            onClick={() => router.push("/magicadmins/tournaments/create")}
                                             className="block mx-auto mt-2 text-purple-400 hover:text-purple-300"
                                         >
                                             Click here to create one.
@@ -325,7 +314,7 @@ export default function AdminTournamentsPage() {
                                                     <div className="flex items-center gap-1">
                                                         <Calendar className="w-3.5 h-3.5" />
                                                         <span>
-                                                            {new Date(t.start_date).toLocaleDateString()} - {new Date(t.end_date).toLocaleDateString()}
+                                                            {new Date(t.start_at).toLocaleDateString()} - {new Date(t.end_at).toLocaleDateString()}
                                                         </span>
                                                     </div>
                                                     <button
@@ -349,17 +338,68 @@ export default function AdminTournamentsPage() {
                         <div className="w-1/2 flex flex-col overflow-hidden bg-black/10">
                             {selectedTournament ? (
                                 <div className="flex-1 flex flex-col overflow-hidden">
+                                    {/* Cover Art Banner */}
+                                    {(selectedTournament.game?.game_image_url || selectedTournament.game?.thumbnail_url) && (
+                                        <div className="w-full h-44 relative shrink-0 overflow-hidden border-b border-white/10 group">
+                                            <img
+                                                src={selectedTournament.game.game_image_url || selectedTournament.game.thumbnail_url!}
+                                                alt={selectedTournament.game.title}
+                                                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                            />
+                                            {/* Sleek Gradient & Glow overlay */}
+                                            <div className="absolute inset-0 bg-gradient-to-t from-[#150725] via-[#150725]/50 to-transparent" />
+                                            {/* Game Title Badge on Cover Art */}
+                                            <div className="absolute bottom-4 left-6 flex items-center gap-2 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 shadow-lg">
+                                                <Gamepad2 className="w-3.5 h-3.5 text-purple-400" />
+                                                <span className="text-[10px] font-bold text-gray-200 uppercase tracking-wider">
+                                                    {selectedTournament.game.title}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )}
                                     {/* Selected Title */}
-                                    <div className="p-6 border-b border-white/5 bg-white/[0.01]">
+                                    <div className="p-6 border-b border-white/5 bg-white/[0.01] shrink-0">
                                         <div className="flex items-center gap-2 mb-2">
                                             <Trophy className="w-5 h-5 text-yellow-400" />
-                                            <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider">Tournament Leaderboard</span>
+                                            <span className="text-xs font-bold text-yellow-400 uppercase tracking-wider">Tournament Management</span>
                                         </div>
                                         <h2 className="text-xl font-bold text-white mb-1">{selectedTournament.title}</h2>
-                                        <p className="text-xs text-gray-400">{selectedTournament.description || "No description provided."}</p>
+                                        <p className="text-xs text-gray-400 mb-3">{selectedTournament.description || "No description provided."}</p>
+                                        
+                                        <div className="flex items-center gap-3 mb-4">
+                                            <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold border ${getTournamentStatus(selectedTournament).color}`}>
+                                                {getTournamentStatus(selectedTournament).label}
+                                            </span>
+
+                                            {selectedTournament.status === 'upcoming' && (
+                                                <button
+                                                    onClick={handleStartTournament}
+                                                    className="px-4 py-1.5 bg-green-600 hover:bg-green-500 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                                                >
+                                                    Start Tournament
+                                                </button>
+                                            )}
+                                            {selectedTournament.status === 'active' && (
+                                                <button
+                                                    onClick={handleEndTournament}
+                                                    className="px-4 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer"
+                                                >
+                                                    End Tournament
+                                                </button>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Tab Headers */}
+                                        <div className="flex border-b border-white/5">
+                                            <button
+                                                className="pb-3 text-xs font-bold uppercase tracking-wider border-b-2 border-purple-500 text-purple-400 mr-6"
+                                            >
+                                                Leaderboard standings
+                                            </button>
+                                        </div>
                                     </div>
 
-                                    {/* Standing table */}
+                                    {/* Tab Content */}
                                     <div className="flex-1 overflow-y-auto p-6">
                                         {loadingLeaderboard ? (
                                             <div className="flex justify-center py-20">
@@ -376,8 +416,6 @@ export default function AdminTournamentsPage() {
                                                     const name = entry.profile?.full_name || entry.profile?.username || "Gamer";
                                                     const username = entry.profile?.username ? `@${entry.profile.username}` : "Gamer";
                                                     
-                                                    // Medal colors
-                                                    const isTop3 = index < 3;
                                                     const rankBg = index === 0 
                                                         ? "bg-yellow-500/15 border-yellow-500/30 text-yellow-400" 
                                                         : index === 1 
@@ -388,18 +426,16 @@ export default function AdminTournamentsPage() {
 
                                                     return (
                                                         <div
-                                                            key={entry.id}
+                                                            key={entry.user_id}
                                                             className={`flex items-center justify-between p-4 rounded-xl border ${
                                                                 index === 0 ? "bg-white/5 border-white/10" : "bg-white/[0.02] border-white/5"
                                                             }`}
                                                         >
                                                             <div className="flex items-center gap-4">
-                                                                {/* Rank badge */}
                                                                 <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-sm ${rankBg}`}>
                                                                     {index + 1}
                                                                 </div>
 
-                                                                {/* Gamer avatar and info */}
                                                                 <div className="flex items-center gap-3">
                                                                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-xs font-black overflow-hidden relative border border-white/10">
                                                                         {entry.profile?.avatar_url ? (
@@ -417,7 +453,7 @@ export default function AdminTournamentsPage() {
 
                                                             <div className="text-right">
                                                                 <div className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-purple-400">
-                                                                    {entry.score.toLocaleString()} pts
+                                                                    {entry.high_score.toLocaleString()} pts
                                                                 </div>
                                                                 <div className="text-[9px] text-gray-500">
                                                                     {new Date(entry.updated_at).toLocaleDateString()}
@@ -441,138 +477,7 @@ export default function AdminTournamentsPage() {
                 )}
             </main>
 
-            {/* Create Tournament Modal */}
-            {showCreateModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-                    <div
-                        className="absolute inset-0 bg-[#0d0f14]/80 backdrop-blur-md"
-                        onClick={() => setShowCreateModal(false)}
-                    />
-                    
-                    <div className="relative w-full max-w-lg bg-[#1a0b2e] border border-white/10 rounded-3xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-                        <div className="p-6 border-b border-white/5 flex items-center justify-between">
-                            <h3 className="text-lg font-bold">New Tournament</h3>
-                            <button
-                                onClick={() => setShowCreateModal(false)}
-                                className="p-2 hover:bg-white/5 rounded-xl text-gray-400 hover:text-white transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
 
-                        <form onSubmit={handleCreateTournament} className="p-6 space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                                    Tournament Title *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                    className="w-full bg-black/20 border border-white/10 text-white rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder-gray-500"
-                                    placeholder="e.g. Summer Smash Arena"
-                                    required
-                                />
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                                    Description
-                                </label>
-                                <textarea
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    className="w-full bg-black/20 border border-white/10 text-white rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500/50 placeholder-gray-500 h-20 resize-none"
-                                    placeholder="Explain rules, prizes, or dates details..."
-                                />
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                                    Select Game Target *
-                                </label>
-                                <select
-                                    value={gameId}
-                                    onChange={(e) => setGameId(e.target.value)}
-                                    className="w-full bg-black/20 border border-white/10 text-white rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                    required
-                                >
-                                    <option value="" disabled className="bg-[#1a0b2e]">Select game...</option>
-                                    {games.map((g) => (
-                                        <option key={g.id} value={g.id} className="bg-[#1a0b2e]">
-                                            {g.title}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                                        Start Date/Time *
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        value={startDate}
-                                        onChange={(e) => setStartDate(e.target.value)}
-                                        className="w-full bg-black/20 border border-white/10 text-white rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                        required
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-xs font-semibold text-gray-300 uppercase tracking-wider">
-                                        End Date/Time *
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        value={endDate}
-                                        onChange={(e) => setEndDate(e.target.value)}
-                                        className="w-full bg-black/20 border border-white/10 text-white rounded-xl py-3 px-4 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-3 py-2">
-                                <input
-                                    type="checkbox"
-                                    id="is-active"
-                                    checked={isActive}
-                                    onChange={(e) => setIsActive(e.target.checked)}
-                                    className="w-5 h-5 rounded border-white/10 bg-black/20 text-purple-600 focus:ring-purple-500/50 focus:ring-offset-0 focus:outline-none"
-                                />
-                                <label htmlFor="is-active" className="text-xs font-semibold text-gray-300 uppercase tracking-wider cursor-pointer select-none">
-                                    Tournament Active / Enabled (Visible to users)
-                                </label>
-                            </div>
-
-                            <div className="flex gap-3 pt-4 border-t border-white/5">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowCreateModal(false)}
-                                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 text-gray-300 font-bold rounded-xl text-xs uppercase tracking-wider transition-all"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={submitting}
-                                    className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl text-xs uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                                >
-                                    {submitting ? (
-                                        <>
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                            Creating...
-                                        </>
-                                    ) : (
-                                        "Create Now"
-                                    )}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

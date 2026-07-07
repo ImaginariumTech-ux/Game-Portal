@@ -8,87 +8,72 @@ const supabaseAdmin = createClient(
 
 /**
  * API Endpoint: GET /api/game/init
- * Description: Called by the game engine to retrieve room and player data.
- * Query Params: roomId
+ * Description: Called by the game engine to retrieve single-player session and player data.
+ * Query Params: sessionId (maps to game_sessions.id)
  */
 export async function GET(req: Request) {
   try {
-    // Handle OPTIONS for CORS
-    if (req.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-      });
-    }
-
     const { searchParams } = new URL(req.url);
-    const roomId = searchParams.get('roomId');
+    const sessionId = searchParams.get('sessionId');
 
-    if (!roomId) {
-      return NextResponse.json({ error: 'Room ID is required' }, { status: 400 });
+    if (!sessionId) {
+      return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
     }
 
-    // 1. Fetch Room Data
-    const { data: room, error: roomError } = await supabaseAdmin
-      .from('game_rooms')
+    // 1. Fetch Game Session Data
+    const { data: session, error: sessionError } = await supabaseAdmin
+      .from('game_sessions')
       .select(`
-        id, name, stake_amount, payout_type, payout_config, status,
-        game:games(title, slug, config_schema)
+        id, mode, status,
+        game:games(title, slug),
+        user:profiles(id, full_name, username, avatar_url)
       `)
-      .eq('id', roomId)
+      .eq('id', sessionId)
       .single();
 
-    if (roomError || !room) {
-      return NextResponse.json({ error: 'Room not found' }, { status: 404 });
+    if (sessionError || !session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // 2. Fetch Joined Players
-    const { data: players, error: playersError } = await supabaseAdmin
-      .from('room_players')
-      .select(`
-        user_id,
-        profile:profiles(id, full_name, username, avatar_url)
-      `)
-      .eq('room_id', roomId)
-      .eq('status', 'joined');
-
-    if (playersError) {
-      return NextResponse.json({ error: 'Failed to fetch players' }, { status: 500 });
-    }
-
-    // 3. Format Response
-    const formattedPlayers = (players || []).map(p => {
-      const profile = Array.isArray(p.profile) ? p.profile[0] : p.profile;
-      return {
-        id: p.user_id,
-        name: (profile as any)?.full_name || 'Anonymous',
-        username: (profile as any)?.username,
-        avatar: (profile as any)?.avatar_url
-      };
-    });
+    // 2. Format Response
+    const user = Array.isArray(session.user) ? session.user[0] : session.user;
+    const game = Array.isArray(session.game) ? session.game[0] : session.game;
 
     return NextResponse.json({
       success: true,
-      room: {
-        id: room.id,
-        name: room.name,
-        game_title: Array.isArray(room.game) ? room.game[0]?.title : (room.game as any)?.title,
-        stake_amount: room.stake_amount,
-        payout_type: room.payout_type,
-        payout_config: room.payout_config,
-        status: room.status
+      session: {
+        id: session.id,
+        mode: session.mode,
+        status: session.status,
+        game_title: (game as any)?.title || 'Unknown Game',
+        game_slug: (game as any)?.slug
       },
-      players: formattedPlayers
+      player: {
+        id: (user as any)?.id,
+        name: (user as any)?.full_name || 'Anonymous User',
+        username: (user as any)?.username,
+        avatar: (user as any)?.avatar_url
+      }
     }, {
       headers: {
         'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
       }
     });
 
   } catch (err: any) {
     return NextResponse.json({ error: 'Internal server error', message: err.message }, { status: 500 });
   }
+}
+
+// OPTIONS handler for CORS preflight
+export async function OPTIONS() {
+  return new Response(null, {
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
 }

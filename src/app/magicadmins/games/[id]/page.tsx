@@ -21,6 +21,9 @@ export default function ManageGamePage() {
 
     // Form State
     const [title, setTitle] = useState("");
+    const [slug, setSlug] = useState("");
+    const [webhookSecret, setWebhookSecret] = useState("");
+    const [copied, setCopied] = useState(false);
     const [description, setDescription] = useState("");
     const [version, setVersion] = useState("");
     const [gameUrl, setGameUrl] = useState("");
@@ -93,6 +96,8 @@ export default function ManageGamePage() {
             if (error) throw error;
 
             setTitle(game.title || '');
+            setSlug(game.slug || '');
+            setWebhookSecret(game.webhook_secret || '');
             setDescription(game.description || '');
             setVersion(game.version || '');
             setGameUrl(game.game_url || '');
@@ -204,13 +209,13 @@ export default function ManageGamePage() {
             }
 
             // 3. Update Game
-            const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            const finalSlug = (slug || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
             const { error: updateError } = await supabase
                 .from('games')
                 .update({
                     title,
-                    slug,
+                    slug: finalSlug,
                     description,
                     version,
                     game_url: gameUrl,
@@ -470,9 +475,26 @@ export default function ManageGamePage() {
                                                     <input
                                                         type="text"
                                                         value={title}
-                                                        onChange={(e) => setTitle(e.target.value)}
+                                                        onChange={(e) => {
+                                                            setTitle(e.target.value);
+                                                            // Auto-generate slug on change if user hasn't explicitly customized it yet, or keep in sync if empty
+                                                            if (!slug || slug === title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')) {
+                                                                setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
+                                                            }
+                                                        }}
                                                         className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
                                                         required
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-gray-300">Game Slug</label>
+                                                    <input
+                                                        type="text"
+                                                        value={slug}
+                                                        onChange={(e) => setSlug(e.target.value)}
+                                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-mono"
+                                                        placeholder="e.g. ludo-royale"
                                                     />
                                                 </div>
 
@@ -889,15 +911,38 @@ export default function ManageGamePage() {
                                                 </div>
                                                 <div>
                                                     <div className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">Slug</div>
-                                                    <div className="text-white font-mono text-sm truncate" title={gameUrl}>{title.toLowerCase().replace(/ /g, '-')}</div>
+                                                    <div className="text-white font-mono text-sm truncate" title={slug}>{slug || "—"}</div>
                                                 </div>
                                             </div>
 
                                             <div>
                                                 <div className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">Game URL</div>
-                                                <a href={gameUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm break-all hover:underline block truncate">
+                                                <a href={gameUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm break-all hover:underline block truncate" title={gameUrl}>
                                                     {gameUrl}
                                                 </a>
+                                            </div>
+
+                                            <hr className="border-white/10" />
+
+                                            <div>
+                                                <div className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">Webhook Secret</div>
+                                                <div className="flex items-center gap-2 mt-1.5">
+                                                    <code className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-purple-300 select-all break-all block">
+                                                        {webhookSecret || "Not Configured"}
+                                                    </code>
+                                                    {webhookSecret && (
+                                                        <button
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(webhookSecret);
+                                                                setCopied(true);
+                                                                setTimeout(() => setCopied(false), 2000);
+                                                            }}
+                                                            className="px-3 py-2 bg-purple-600 hover:bg-purple-500 active:scale-95 transition-all text-white font-bold rounded-lg text-xs shrink-0 cursor-pointer"
+                                                        >
+                                                            {copied ? "Copied!" : "Copy"}
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

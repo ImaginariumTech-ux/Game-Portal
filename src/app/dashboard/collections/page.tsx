@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase/client";
 import Image from "next/image";
 import Link from "next/link";
 import {
-    Sparkles, Search, Bell, Wallet, Home, Gamepad2, Users,
+    Sparkles, Search, Bell, Home, Gamepad2, Users,
     HelpCircle, BarChart3, LogOut, Folder, MapPin, Calendar, Zap, LayoutGrid, DoorOpen, Trophy, Menu
 } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
@@ -103,12 +103,7 @@ export default function CollectionsPage() {
                     >
                         <Menu className="w-5 h-5" />
                     </button>
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
-                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
-                            <span className="text-[8px] font-black text-white">M</span>
-                        </div>
-                        <span className="text-sm font-bold text-slate-800">1,022.00</span>
-                    </div>
+
 
                     <div className="ml-auto flex items-center gap-2">
                         <div className="relative">

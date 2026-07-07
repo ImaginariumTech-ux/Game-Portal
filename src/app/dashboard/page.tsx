@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import Image from "next/image";
 import {
-    LogOut, Sparkles, Zap, Search, Bell, Wallet, Home,
+    LogOut, Sparkles, Zap, Search, Bell, Home,
     Gamepad2, Users, HelpCircle, BarChart3, Globe,
     Trophy, Play, Folder, TrendingUp, UserCheck, UserMinus,
     MapPin, Calendar, Hash, ExternalLink, DoorOpen, Star, Menu,
@@ -239,6 +239,19 @@ export default function UserDashboard() {
         router.push("/");
     };
 
+    // Auto-rotate featured games carousel (full-width slideshow)
+    const [activeSlide, setActiveSlide] = useState(0);
+
+    useEffect(() => {
+        if (featuredGames.length <= 1) return;
+
+        const interval = setInterval(() => {
+            setActiveSlide((prev) => (prev + 1) % featuredGames.length);
+        }, 5000);
+
+        return () => clearInterval(interval);
+    }, [featuredGames]);
+
     const handlePlayGame = async (game: Game) => {
         if (!game.game_url) return;
         try {
@@ -248,43 +261,28 @@ export default function UserDashboard() {
                 return;
             }
 
-            // Create a practice room
-            const roomId = crypto.randomUUID();
-            const joinCode = `PRACTICE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-            // Increment plays count in DB
-            await supabase.rpc('increment_game_plays', { p_game_id: game.id });
-
-            // Insert game_room
-            const { error: roomErr } = await supabase.from('game_rooms').insert({
-                id: roomId,
-                name: `Practice: ${game.title}`,
-                host_id: user.id,
-                game_id: game.id,
-                mode: 'practice',
-                status: 'live',
-                stake_amount: 0,
-                join_code: joinCode,
-                max_players: 1
+            // Call session generation API
+            const response = await fetch("/api/game/session", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    gameId: game.id,
+                    mode: 'practice'
+                })
             });
 
-            if (roomErr) throw roomErr;
-
-            // Insert room_player membership
-            const { error: playerErr } = await supabase.from('room_players').insert({
-                room_id: roomId,
-                user_id: user.id,
-                status: 'joined',
-                is_ready: true
-            });
-
-            if (playerErr) throw playerErr;
+            const resData = await response.json();
+            if (!response.ok || !resData.success) {
+                throw new Error(resData.error || "Failed to start practice session");
+            }
 
             // Redirect to the unified play page
-            router.push(`/dashboard/play/${roomId}`);
-        } catch (err) {
+            router.push(`/dashboard/play/${resData.sessionId}`);
+        } catch (err: any) {
             console.error("Error launching practice session:", err);
-            alert("Failed to start practice session");
+            alert(err.message || "Failed to start practice session");
         }
     };
 
@@ -349,22 +347,10 @@ export default function UserDashboard() {
                         <Menu className="w-5 h-5" />
                     </button>
 
-                    {/* Coins */}
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
-                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
-                            <span className="text-[8px] font-black text-white">M</span>
-                        </div>
-                        <span className="text-sm font-bold text-slate-800">1,022.00</span>
-                    </div>
-
-                    <button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5">
-                        <Wallet className="w-3 h-3" /> Wallet
-                    </button>
-
                     <div className="flex-1" />
 
                     {/* Search */}
-                    <div className="relative">
+                    <div className="relative hidden md:block">
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                         <input
                             value={searchQuery}
@@ -381,15 +367,15 @@ export default function UserDashboard() {
                     </button>
 
                     {/* User */}
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full pl-1 pr-3 py-1">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-[10px] font-bold text-white">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full p-1 md:pl-1 md:pr-3">
+                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-[10px] font-bold text-white shrink-0">
                             {displayName[0]?.toUpperCase()}
                         </div>
-                        <span className="text-xs font-semibold text-slate-700">{displayName}</span>
+                        <span className="text-xs font-semibold text-slate-700 hidden md:block">{displayName}</span>
                     </div>
 
                     {/* Logout */}
-                    <button onClick={handleLogout} className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center hover:bg-red-50 hover:border-red-200 transition-all group">
+                    <button onClick={handleLogout} className="w-8 h-8 rounded-full bg-slate-50 border border-slate-200 hidden md:flex items-center justify-center hover:bg-red-50 hover:border-red-200 transition-all group">
                         <LogOut className="w-3.5 h-3.5 text-slate-500 group-hover:text-red-600" />
                     </button>
                 </header>
@@ -407,7 +393,7 @@ export default function UserDashboard() {
                         {/* Welcome banner */}
                         <div className="relative rounded-xl overflow-hidden bg-gradient-to-r from-purple-600 to-indigo-600 border border-purple-700/10 p-5 shadow-sm text-white">
                             <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-500/20 rounded-full blur-3xl pointer-events-none" />
-                            <div className="relative z-10 flex items-center justify-between">
+                            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div>
                                     <h1 className="text-xl font-black mb-0.5">Welcome back, {displayName}! 👋</h1>
                                     <p className="text-sm text-white/90">
@@ -429,83 +415,98 @@ export default function UserDashboard() {
                             </div>
                         </div>
 
+                        {/* Mobile Search Bar */}
+                        <div className="relative md:hidden">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                            <input
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-purple-500/50 shadow-sm"
+                                placeholder="Search games..."
+                            />
+                        </div>
+
                         {/* ── Featured Games ─────────────────────────────────────────── */}
                         {featuredGames.length > 0 && (
                             <div>
                                 <div className="flex items-center gap-2 mb-3">
                                     <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                                     <h2 className="font-bold text-sm uppercase tracking-wide text-slate-800">Featured Games</h2>
-                                    <span className="ml-auto text-[9px] text-slate-400 font-medium uppercase tracking-wider">Curated by Admin</span>
                                 </div>
 
-                                {/* Big hero card — first featured game */}
-                                {featuredGames[0] && (
-                                    <div className="relative h-52 rounded-2xl overflow-hidden group mb-3 shadow-md">
-                                        {featuredGames[0].thumbnail_url ? (
-                                            <Image
-                                                src={featuredGames[0].thumbnail_url}
-                                                alt={featuredGames[0].title}
-                                                fill
-                                                className="object-cover transition-transform duration-700 group-hover:scale-105"
-                                            />
-                                        ) : (
-                                            <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600" />
-                                        )}
-                                        <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                                {/* Full-width slideshow carousel */}
+                                <div className="relative h-52 sm:h-56 rounded-2xl overflow-hidden shadow-md group">
+                                    {featuredGames.map((game, i) => (
+                                        <div
+                                            key={game.id}
+                                            className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+                                                i === activeSlide
+                                                    ? "opacity-100 scale-100 z-10"
+                                                    : "opacity-0 scale-105 z-0"
+                                            }`}
+                                        >
+                                            {game.thumbnail_url ? (
+                                                <Image
+                                                    src={game.thumbnail_url}
+                                                    alt={game.title}
+                                                    fill
+                                                    className="object-cover"
+                                                />
+                                            ) : (
+                                                <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-indigo-600 to-blue-600" />
+                                            )}
+                                            <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent" />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
 
-                                        <div className="absolute bottom-0 left-0 p-5 w-2/3">
-                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 text-[9px] font-bold mb-2 backdrop-blur-md">
-                                                <Star className="w-2.5 h-2.5 fill-current" /> Featured
-                                            </div>
-                                            <h2 className="text-2xl font-black mb-1 leading-tight text-white">{featuredGames[0].title}</h2>
-                                            <p className="text-white/90 text-xs mb-3 line-clamp-2">
-                                                {featuredGames[0].description || "No description provided."}
-                                            </p>
-                                            <button
-                                                onClick={() => handlePlayGame(featuredGames[0])}
-                                                disabled={!featuredGames[0].game_url}
-                                                className="px-5 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-purple-500/20 transition-all transform hover:-translate-y-0.5 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                <Play className="w-3 h-3 fill-current" />
-                                                {featuredGames[0].game_url ? 'Play Game' : 'Coming Soon'}
-                                            </button>
-                                        </div>
-
-                                        {/* Plays badge */}
-                                        <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md rounded-lg px-2 py-1 flex items-center gap-1 border border-white/10">
-                                            <Zap className="w-2.5 h-2.5 text-yellow-400" />
-                                            <span className="text-[9px] font-bold text-white">{(featuredGames[0].plays || 0).toLocaleString()} plays</span>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Additional featured games — small cards */}
-                                {featuredGames.length > 1 && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {featuredGames.slice(1, 3).map((game, i) => (
-                                            <div key={game.id} className="relative h-28 rounded-xl overflow-hidden group cursor-pointer shadow-sm"
-                                                onClick={() => handlePlayGame(game)}
-                                            >
-                                                {game.thumbnail_url ? (
-                                                    <Image src={game.thumbnail_url} alt={game.title} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
-                                                ) : (
-                                                    <div className={`absolute inset-0 bg-gradient-to-br ${GRADIENTS[i % GRADIENTS.length].from}`} />
-                                                )}
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                                                <div className="absolute bottom-0 left-0 p-3">
-                                                    <p className="text-xs font-bold text-white leading-tight">{game.title}</p>
-                                                    <p className="text-[8px] text-white/80 flex items-center gap-1 mt-0.5">
-                                                        <Play className="w-2 h-2" />{(game.plays || 0).toLocaleString()} plays
-                                                    </p>
+                                            <div className="absolute bottom-0 left-0 p-5 w-2/3 z-10">
+                                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 text-[9px] font-bold mb-2 backdrop-blur-md">
+                                                    <Star className="w-2.5 h-2.5 fill-current" /> Featured
                                                 </div>
-                                                <div className="absolute top-2 right-2 bg-black/40 rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <Play className="w-3 h-3 text-white fill-white" />
-                                                </div>
+                                                <h2 className="text-2xl font-black mb-1 leading-tight text-white">{game.title}</h2>
+                                                <p className="text-white/90 text-xs mb-3 line-clamp-2">
+                                                    {game.description || "No description provided."}
+                                                </p>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handlePlayGame(game);
+                                                    }}
+                                                    disabled={!game.game_url}
+                                                    className="px-5 py-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-bold rounded-xl text-xs shadow-lg shadow-purple-500/20 transition-all transform hover:-translate-y-0.5 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                                >
+                                                    <Play className="w-3 h-3 fill-current" />
+                                                    {game.game_url ? 'Play Game' : 'Coming Soon'}
+                                                </button>
                                             </div>
-                                        ))}
-                                    </div>
-                                )}
+
+                                            {/* Plays badge */}
+                                            <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md rounded-lg px-2 py-1 flex items-center gap-1 border border-white/10 z-10">
+                                                <Zap className="w-2.5 h-2.5 text-yellow-400" />
+                                                <span className="text-[9px] font-bold text-white">{(game.plays || 0).toLocaleString()} plays</span>
+                                            </div>
+                                        </div>
+                                    ))}
+
+                                    {/* Dot indicators */}
+                                    {featuredGames.length > 1 && (
+                                        <div className="absolute bottom-3 right-3 flex items-center gap-1.5 z-20">
+                                            {featuredGames.map((_, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setActiveSlide(i);
+                                                    }}
+                                                    className={`rounded-full transition-all duration-300 cursor-pointer ${
+                                                        i === activeSlide
+                                                            ? "w-5 h-2 bg-white"
+                                                            : "w-2 h-2 bg-white/40 hover:bg-white/60"
+                                                    }`}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         )}
 

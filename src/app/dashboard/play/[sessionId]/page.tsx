@@ -7,12 +7,9 @@ import {
     ArrowLeft,
     Trophy,
     RotateCcw,
-    Home,
     Loader2,
     Sparkles,
     Smile,
-    Award,
-    Activity,
     Gamepad2
 } from "lucide-react";
 import Link from "next/link";
@@ -24,12 +21,15 @@ interface Game {
     game_url: string;
 }
 
-interface Room {
+interface GameSession {
     id: string;
-    name: string;
     game_id: string;
+    user_id: string;
     mode: string;
     tournament_id: string | null;
+    session_token: string;
+    status: string;
+    score: number | null;
     game?: Game;
 }
 
@@ -41,11 +41,11 @@ interface Tournament {
 export default function GamePlayPage() {
     const params = useParams();
     const router = useRouter();
-    const roomId = params.roomId as string;
+    const sessionId = params.sessionId as string;
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     const [userId, setUserId] = useState<string | null>(null);
-    const [room, setRoom] = useState<Room | null>(null);
+    const [session, setSession] = useState<GameSession | null>(null);
     const [tournament, setTournament] = useState<Tournament | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -69,39 +69,39 @@ export default function GamePlayPage() {
                 }
                 setUserId(user.id);
 
-                // Fetch room details
-                const { data: roomData, error: roomErr } = await supabase
-                    .from("game_rooms")
+                // Fetch session details
+                const { data: sessionData, error: sessionErr } = await supabase
+                    .from("game_sessions")
                     .select(`
                         *,
                         game:games(id, title, game_url)
                     `)
-                    .eq("id", roomId)
+                    .eq("id", sessionId)
                     .maybeSingle();
 
-                if (roomErr) throw roomErr;
-                if (!roomData) {
+                if (sessionErr) throw sessionErr;
+                if (!sessionData) {
                     setError("Session not found or has expired.");
                     setLoading(false);
                     return;
                 }
 
-                setRoom(roomData);
+                setSession(sessionData);
 
-                // If room is linked to tournament, fetch tournament details
-                if (roomData.tournament_id) {
+                // If session is linked to tournament, fetch tournament details
+                if (sessionData.tournament_id) {
                     const { data: tourData } = await supabase
                         .from("tournaments")
                         .select("id, title")
-                        .eq("id", roomData.tournament_id)
+                        .eq("id", sessionData.tournament_id)
                         .maybeSingle();
                     if (tourData) setTournament(tourData);
                 }
 
                 setLoading(false);
 
-                // Setup realtime listener for match completion on room_players
-                setupRealtimeListener(user.id, roomData.tournament_id);
+                // Setup realtime listener for session updates on game_sessions
+                setupRealtimeListener(user.id, sessionData.tournament_id);
 
             } catch (err: any) {
                 console.error("Error loading play session:", err);
@@ -111,26 +111,25 @@ export default function GamePlayPage() {
         };
 
         init();
-    }, [roomId, router]);
+    }, [sessionId, router]);
 
     const setupRealtimeListener = (currentUserId: string, tournamentId: string | null) => {
         const channel = supabase
-            .channel(`play-session-${roomId}`)
+            .channel(`play-session-${sessionId}`)
             .on("postgres_changes", {
                 event: "UPDATE",
                 schema: "public",
-                table: "room_players",
-                filter: `room_id=eq.${roomId}`
+                table: "game_sessions",
+                filter: `id=eq.${sessionId}`
             }, async (payload) => {
-                const updatedPlayer = payload.new;
+                const updatedSession = payload.new;
                 
-                // If this is our user record and we have a score submitted
-                if (updatedPlayer.user_id === currentUserId && 
-                    updatedPlayer.score !== null && 
-                    updatedPlayer.score !== undefined) {
+                if (updatedSession.status === 'completed' && 
+                    updatedSession.score !== null && 
+                    updatedSession.score !== undefined) {
                     
-                    console.log("Match completion detected! Score:", updatedPlayer.score);
-                    await handleMatchFinished(Number(updatedPlayer.score), currentUserId, tournamentId);
+                    console.log("Match completion detected! Score:", updatedSession.score);
+                    await handleMatchFinished(Number(updatedSession.score), currentUserId, tournamentId);
                 }
             })
             .subscribe();
@@ -150,16 +149,16 @@ export default function GamePlayPage() {
                 // Fetch the tournament leaderboard entries to see where we rank and what our best score is
                 const { data: lbEntries, error: lbErr } = await supabase
                     .from("tournament_leaderboard")
-                    .select("user_id, score")
+                    .select("user_id, high_score")
                     .eq("tournament_id", tournamentId)
-                    .order("score", { ascending: false });
+                    .order("high_score", { ascending: false });
 
                 if (lbErr) throw lbErr;
 
                 if (lbEntries) {
                     // Find user's best score
                     const userBestEntry = lbEntries.find(e => e.user_id === currentUserId);
-                    const best = userBestEntry ? Number(userBestEntry.score) : score;
+                    const best = userBestEntry ? Number(userBestEntry.high_score) : score;
                     setBestScore(best);
 
                     // Check if the current run score was high enough to be the high score (or matches it)
@@ -179,7 +178,7 @@ export default function GamePlayPage() {
     };
 
     const handlePlayAgain = async () => {
-        if (!room || !room.game || !userId) return;
+        if (!session || !session.game || !userId) return;
         
         try {
             setLoading(true);
@@ -189,44 +188,29 @@ export default function GamePlayPage() {
             setBestScore(null);
             setLeaderboardRank(null);
 
-            // Create a brand new session room in DB
-            const newRoomId = crypto.randomUUID();
-            const joinCode = (room.tournament_id ? "TOUR-" : "PRACTICE-") + Math.random().toString(36).substring(2, 8).toUpperCase();
-
-            // Increment plays count in DB
-            await supabase.rpc('increment_game_plays', { p_game_id: room.game.id });
-
-            // Insert game_room record
-            const { error: roomErr } = await supabase.from('game_rooms').insert({
-                id: newRoomId,
-                name: room.tournament_id ? `Tournament: ${tournament?.title}` : `Practice: ${room.game.title}`,
-                host_id: userId,
-                game_id: room.game.id,
-                mode: 'practice',
-                status: 'live',
-                stake_amount: 0,
-                join_code: joinCode,
-                max_players: 1,
-                tournament_id: room.tournament_id
+            // Call session generation API
+            const response = await fetch("/api/game/session", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    gameId: session.game.id,
+                    mode: session.mode,
+                    tournamentId: session.tournament_id
+                })
             });
 
-            if (roomErr) throw roomErr;
-
-            // Insert room_player record
-            const { error: playerErr } = await supabase.from('room_players').insert({
-                room_id: newRoomId,
-                user_id: userId,
-                status: 'joined',
-                is_ready: true
-            });
-
-            if (playerErr) throw playerErr;
+            const resData = await response.json();
+            if (!response.ok || !resData.success) {
+                throw new Error(resData.error || "Failed to start new session");
+            }
 
             // Navigate to new play page
-            router.replace(`/dashboard/play/${newRoomId}`);
-        } catch (err) {
+            router.replace(`/dashboard/play/${resData.sessionId}`);
+        } catch (err: any) {
             console.error("Error restarting match:", err);
-            toast.error("Failed to start new match");
+            toast.error(err.message || "Failed to start new match");
             setLoading(false);
         }
     };
@@ -251,11 +235,12 @@ export default function GamePlayPage() {
         );
     }
 
-    if (!room || !room.game) return null;
+    if (!session || !session.game) return null;
 
-    const gameUrl = room.game.game_url;
+    const gameUrl = session.game.game_url;
     const separator = gameUrl.includes("?") ? "&" : "?";
-    const finalUrl = `${gameUrl}${separator}roomId=${roomId}&myRoomId=${roomId}`;
+    // We send sessionId=sessionId and sessionToken=JWT to ensure compliance
+    const finalUrl = `${gameUrl}${separator}sessionId=${sessionId}&sessionToken=${session.session_token}`;
 
     return (
         <div className="relative h-screen w-screen overflow-hidden bg-black text-white font-sans">
@@ -271,7 +256,7 @@ export default function GamePlayPage() {
                         <ArrowLeft className="w-5 h-5" />
                     </button>
                     <span className="text-xs font-bold uppercase tracking-wider bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl border border-white/5 shadow-lg select-none">
-                        Playing {room.game.title} {tournament && `(Tournament: ${tournament.title})`}
+                        Playing {session.game.title} {tournament && `(Tournament: ${tournament.title})`}
                     </span>
                 </div>
             )}
@@ -321,7 +306,7 @@ export default function GamePlayPage() {
                                     {tournament ? (isHighScore ? "New Record!" : "Match Finished!") : "Practice Complete!"}
                                 </h2>
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mb-6">
-                                    {tournament ? `Tournament: ${tournament.title}` : `Training run on ${room.game.title}`}
+                                    {tournament ? `Tournament: ${tournament.title}` : `Training run on ${session.game.title}`}
                                 </p>
 
                                 {/* Score Showcase */}
@@ -374,7 +359,7 @@ export default function GamePlayPage() {
                                         </button>
                                     ) : (
                                         <button
-                                            onClick={() => router.push(`/dashboard/games/${room.game_id}`)}
+                                            onClick={() => router.push(`/dashboard/games/${session.game_id}`)}
                                             className="w-full py-4 bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 font-black text-xs uppercase tracking-[0.15em] rounded-2xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
                                         >
                                             <Gamepad2 className="w-4 h-4" /> Game Details

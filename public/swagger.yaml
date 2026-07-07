@@ -4,132 +4,110 @@ info:
   description: |
     This API documentation is for game developers integrating their games into the MagicGames portal.
     
-    The portal loads games inside an iframe and passes the `roomId` as a query parameter.
-    
-    **Note**: While this documentation describes the data schema, developers should access the live data directly via **Supabase** using the following credentials:
-    - **Supabase URL**: `https://etschqfatclugukntchl.supabase.co`
-    - **Anon Key**: (Check your secure project settings)
+    The portal loads games inside an iframe and passes the `sessionId` as a query parameter.
   version: 1.0.0
 
 servers:
-  - url: https://game-portal-cyan.vercel.app/api
-    description: Production API Base (Vercel)
+  - url: /api
 
 paths:
-  /rooms/{roomId}:
+  /game/init:
     get:
-      summary: Get Room Details
-      description: Fetches the metadata for a specific game room.
+      summary: Initialize Game Session
+      description: Fetches game session details and player profile information.
       parameters:
-        - name: roomId
-          in: path
+        - name: sessionId
+          in: query
           required: true
-          description: The unique ID of the game room.
+          description: The unique ID of the game session.
           schema:
             type: string
             format: uuid
       responses:
         '200':
-          description: Room details retrieved successfully.
+          description: Session details retrieved successfully.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Room'
+                $ref: '#/components/schemas/SessionInitResponse'
 
-  /rooms/{roomId}/players:
-    get:
-      summary: Get Players and Characters
-      description: Fetches all players currently in the room, including their selected characters and profile info.
+  /game/match/complete:
+    post:
+      summary: Submit Match Score
+      description: Submits the final score at the end of the session. Must be signed with HMAC-SHA256 signature header.
       parameters:
-        - name: roomId
-          in: path
+        - name: X-Portal-Signature
+          in: header
           required: true
-          description: The unique ID of the game room.
+          description: Hex-encoded HMAC-SHA256 signature of the raw request body signed with the game's webhook_secret.
           schema:
             type: string
-            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - sessionId
+                - score
+              properties:
+                sessionId:
+                  type: string
+                  format: uuid
+                score:
+                  type: integer
       responses:
         '200':
-          description: List of players and their characters.
+          description: Score submitted successfully.
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Player'
+                $ref: '#/components/schemas/ScoreSubmissionResponse'
 
 components:
   schemas:
-    Room:
+    SessionInitResponse:
       type: object
       properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-          example: "Friday Night Ludo"
-          description: "The name of the game room as set by the host."
-        status:
-          type: string
-          enum: [forming, live, dissolved]
-          description: "Current state of the room. 'live' means the match has started."
-        max_players:
-          type: integer
-          example: 4
-        player_count:
-          type: integer
-          example: 2
-          description: "The current number of players in the room."
-        stake_amount:
-          type: number
-          example: 50.0
-
-    Player:
-      type: object
-      properties:
-        user_id:
-          type: string
-          format: uuid
-        is_ready:
+        success:
           type: boolean
-        character_id:
-          type: string
-          format: uuid
-        profile:
-          $ref: '#/components/schemas/Profile'
-        character:
-          $ref: '#/components/schemas/Character'
+        session:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            mode:
+              type: string
+              enum: [practice, tournament]
+            status:
+              type: string
+            game_title:
+              type: string
+            game_slug:
+              type: string
+        player:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            name:
+              type: string
+            username:
+              type: string
+            avatar:
+              type: string
 
-    Profile:
+    ScoreSubmissionResponse:
       type: object
       properties:
-        username:
+        success:
+          type: boolean
+        message:
           type: string
-          example: "gamer_pro"
-        full_name:
-          type: string
-          example: "John Doe"
-        avatar_url:
-          type: string
-          format: uri
-
-    Character:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-          example: "Red Warrior"
-        image_url:
-          type: string
-          format: uri
-          example: "https://.../characters/warrior.png"
-
-tags:
-  - name: Room
-    description: Room management and metadata
-  - name: Game
-    description: Game lifecycle and player data
+        is_personal_best:
+          type: boolean
+        best_score:
+          type: integer

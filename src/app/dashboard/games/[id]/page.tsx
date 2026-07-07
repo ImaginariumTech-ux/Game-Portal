@@ -10,7 +10,7 @@ import {
     Gamepad2, Folder, ExternalLink, Heart, Share2,
     Loader2, Globe, Trophy, Users, Home, DoorOpen,
     HelpCircle, BarChart3, LogOut, Sparkles, Zap, Bell,
-    Wallet, MapPin, CheckCircle
+    MapPin, CheckCircle
 } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 
@@ -167,43 +167,28 @@ export default function GameDetailPage() {
                 return;
             }
 
-            // Create a practice room
-            const roomId = crypto.randomUUID();
-            const joinCode = `PRACTICE-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-            // Increment plays count in DB
-            await supabase.from("games").update({ plays: (game.plays || 0) + 1 }).eq("id", gameId);
-
-            // Insert game_room
-            const { error: roomErr } = await supabase.from('game_rooms').insert({
-                id: roomId,
-                name: `Practice: ${game.title}`,
-                host_id: user.id,
-                game_id: game.id,
-                mode: 'practice',
-                status: 'live',
-                stake_amount: 0,
-                join_code: joinCode,
-                max_players: 1
+            // Call session generation API
+            const response = await fetch("/api/game/session", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    gameId: game.id,
+                    mode: 'practice'
+                })
             });
 
-            if (roomErr) throw roomErr;
-
-            // Insert room_player membership
-            const { error: playerErr } = await supabase.from('room_players').insert({
-                room_id: roomId,
-                user_id: user.id,
-                status: 'joined',
-                is_ready: true
-            });
-
-            if (playerErr) throw playerErr;
+            const resData = await response.json();
+            if (!response.ok || !resData.success) {
+                throw new Error(resData.error || "Failed to start practice session");
+            }
 
             // Redirect to the unified play page
-            router.push(`/dashboard/play/${roomId}`);
-        } catch (err) {
+            router.push(`/dashboard/play/${resData.sessionId}`);
+        } catch (err: any) {
             console.error("Error launching practice session:", err);
-            alert("Failed to start practice session");
+            alert(err.message || "Failed to start practice session");
         }
     };
 
@@ -263,15 +248,7 @@ export default function GameDetailPage() {
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Top Bar */}
                 <header className="h-12 flex-shrink-0 bg-white border-b border-slate-200 flex items-center px-4 gap-3">
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
-                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
-                            <span className="text-[8px] font-black text-white">M</span>
-                        </div>
-                        <span className="text-sm font-bold text-slate-800">1,022.00</span>
-                    </div>
-                    <button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5 cursor-pointer">
-                        <Wallet className="w-3 h-3" /> Wallet
-                    </button>
+
                     <div className="ml-auto flex items-center gap-2">
                         <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -351,29 +328,31 @@ export default function GameDetailPage() {
                                     </div>
 
                                     {/* Action buttons */}
-                                    <div className="flex items-center gap-2 pb-1 flex-shrink-0">
-                                        <button
-                                            onClick={toggleFavourite}
-                                            disabled={favouriteLoading}
-                                            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all border cursor-pointer ${isFavourited
-                                                ? "bg-pink-50 text-pink-600 border-pink-200 shadow-sm hover:bg-pink-100/60"
-                                                : "bg-white text-slate-600 border-slate-200 hover:border-pink-200 hover:text-pink-600 hover:bg-pink-50/20 shadow-sm"
-                                                }`}
-                                        >
-                                            <Heart className={`w-4 h-4 ${isFavourited ? "fill-current" : ""}`} />
-                                            {isFavourited ? "Saved" : "Favourite"}
-                                        </button>
-                                        <button
-                                            onClick={handleShare}
-                                            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-800 shadow-sm transition-all cursor-pointer"
-                                        >
-                                            {shared ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
-                                            {shared ? "Copied!" : "Share"}
-                                        </button>
+                                    <div className="flex flex-col gap-2 pb-1 flex-shrink-0 w-full md:w-80">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={toggleFavourite}
+                                                disabled={favouriteLoading}
+                                                className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all border cursor-pointer ${isFavourited
+                                                    ? "bg-pink-50 text-pink-600 border-pink-200 shadow-sm hover:bg-pink-100/60"
+                                                    : "bg-white text-slate-600 border-slate-200 hover:border-pink-200 hover:text-pink-600 hover:bg-pink-50/20 shadow-sm"
+                                                    }`}
+                                            >
+                                                <Heart className={`w-4 h-4 ${isFavourited ? "fill-current" : ""}`} />
+                                                {isFavourited ? "Saved" : "Favourite"}
+                                            </button>
+                                            <button
+                                                onClick={handleShare}
+                                                className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:text-slate-800 shadow-sm transition-all cursor-pointer"
+                                            >
+                                                {shared ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Share2 className="w-4 h-4" />}
+                                                {shared ? "Copied!" : "Share"}
+                                            </button>
+                                        </div>
                                         {game.game_url && (
                                             <button
                                                 onClick={handlePlay}
-                                                className="flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-sm transition-all hover:scale-105 cursor-pointer animate-in fade-in"
+                                                className="w-full flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-sm transition-all hover:scale-102 cursor-pointer animate-in fade-in"
                                             >
                                                 <Play className="w-4 h-4" fill="white" /> Play (Practice Mode)
                                             </button>
@@ -396,21 +375,7 @@ export default function GameDetailPage() {
                                             )}
                                         </div>
 
-                                        {/* Play button (large, if game_url exists) */}
-                                        {game.game_url && (
-                                            <div className="bg-gradient-to-br from-purple-50 to-indigo-50/50 rounded-2xl p-5 border border-purple-100 flex flex-col sm:flex-row gap-4 items-center justify-between shadow-sm">
-                                                <div>
-                                                    <p className="text-slate-800 font-bold mb-0.5">Ready to practice?</p>
-                                                    <p className="text-xs text-slate-500">Click below to start a training match against the computer</p>
-                                                </div>
-                                                <button
-                                                    onClick={handlePlay}
-                                                    className="flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-black bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-sm transition-all hover:scale-105 cursor-pointer"
-                                                >
-                                                    <Play className="w-5 h-5" fill="white" /> Play (Practice Mode)
-                                                </button>
-                                            </div>
-                                        )}
+
                                     </div>
 
                                     {/* Stats sidebar */}

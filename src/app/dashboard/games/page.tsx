@@ -7,7 +7,7 @@ import Image from "next/image";
 import {
     Search, Gamepad2, Play, Star, TrendingUp, Folder,
     Home, Users, Trophy, DoorOpen, HelpCircle, BarChart3,
-    Globe, LogOut, Sparkles, Zap, Bell, Wallet, MapPin,
+    Globe, LogOut, Sparkles, Zap, Bell, MapPin,
     Calendar, Hash, Loader2, Heart, ChevronDown, Menu
 } from "lucide-react";
 import Link from "next/link";
@@ -146,15 +146,7 @@ export default function GamesPage() {
                     >
                         <Menu className="w-5 h-5" />
                     </button>
-                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-3 py-1.5">
-                        <div className="w-4 h-4 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
-                            <span className="text-[8px] font-black text-white">M</span>
-                        </div>
-                        <span className="text-sm font-bold text-slate-800">1,022.00</span>
-                    </div>
-                    <button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5 cursor-pointer">
-                        <Wallet className="w-3 h-3" /> Wallet
-                    </button>
+
                     <div className="ml-auto flex items-center gap-2">
                         <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />

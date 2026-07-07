@@ -7,37 +7,17 @@ import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import AdminSidebar from "@/components/AdminSidebar";
 
-type ModeTab = 'online' | 'room' | 'practice';
-
 export default function InstallGamePage() {
     const router = useRouter();
     const [title, setTitle] = useState("");
+    const [slug, setSlug] = useState("");
     const [description, setDescription] = useState("");
     const [version, setVersion] = useState("1.0.0");
     const [gameUrl, setGameUrl] = useState("");
     const [thumbnail, setThumbnail] = useState<File | null>(null);
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
 
-    // Game Modes - Fixed Templates
-    const [activeTab, setActiveTab] = useState<ModeTab>('online');
 
-    // Online Mode
-    const [onlineEnabled, setOnlineEnabled] = useState(true);
-    const [onlineEntryFee, setOnlineEntryFee] = useState(30);
-    const [onlineMinPlayers, setOnlineMinPlayers] = useState(2);
-    const [onlineMaxPlayers, setOnlineMaxPlayers] = useState(4);
-    const [onlinePrize1st, setOnlinePrize1st] = useState(60);
-    const [onlinePrize2nd, setOnlinePrize2nd] = useState(30);
-    const [onlinePrize3rd, setOnlinePrize3rd] = useState(10);
-    const [onlinePrize4th, setOnlinePrize4th] = useState(0);
-
-    // Game Room Mode
-    const [roomEnabled, setRoomEnabled] = useState(true);
-
-    // Practice Mode
-    const [practiceEnabled, setPracticeEnabled] = useState(true);
-
-    const [hasLeaderboard, setHasLeaderboard] = useState(true);
 
     // Publishing State
     const [publishType, setPublishType] = useState<'now' | 'schedule' | 'draft'>('now');
@@ -121,86 +101,23 @@ export default function InstallGamePage() {
             }
 
             // 3. Insert Game Record
-            const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+            const finalSlug = (slug || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
             const { data: gameData, error: insertError } = await supabase.from('games').insert([
                 {
                     title,
-                    slug,
+                    slug: finalSlug,
                     description,
                     version,
                     game_url: gameUrl,
                     thumbnail_url: thumbnailUrl,
                     status,
                     published_at: publishedAt,
-                    has_leaderboard: hasLeaderboard
+                    has_leaderboard: true
                 }
             ]).select().single();
 
             if (insertError) throw insertError;
-
-            // 4. Insert Game Modes (Fixed Templates)
-            if (gameData) {
-                const modesData = [];
-
-                // Online Mode
-                if (onlineEnabled) {
-                    modesData.push({
-                        game_id: gameData.id,
-                        name: "Online Ranked",
-                        slug: "online",
-                        description: "Competitive matchmaking with leaderboard ranking",
-                        platform_fee: onlineEntryFee,
-                        prize_distribution: {
-                            "1": onlinePrize1st,
-                            "2": onlinePrize2nd,
-                            "3": onlinePrize3rd,
-                            "4": onlinePrize4th
-                        },
-                        min_players: onlineMinPlayers,
-                        max_players: onlineMaxPlayers,
-                        affects_leaderboard: true
-                    });
-                }
-
-                // Game Room Mode
-                if (roomEnabled) {
-                    modesData.push({
-                        game_id: gameData.id,
-                        name: "Friend Room",
-                        slug: "room",
-                        description: "Play with friends in private rooms",
-                        platform_fee: 0,
-                        prize_distribution: {},
-                        min_players: 2,
-                        max_players: 4,
-                        affects_leaderboard: false
-                    });
-                }
-
-                // Practice Mode
-                if (practiceEnabled) {
-                    modesData.push({
-                        game_id: gameData.id,
-                        name: "Practice",
-                        slug: "practice",
-                        description: "Play against computer for free",
-                        platform_fee: 0,
-                        prize_distribution: {},
-                        min_players: 1,
-                        max_players: 1,
-                        affects_leaderboard: false
-                    });
-                }
-
-                if (modesData.length > 0) {
-                    const { error: modesError } = await supabase.from('game_modes').insert(modesData);
-                    if (modesError) {
-                        console.error("Error adding game modes:", JSON.stringify(modesError, null, 2));
-                        alert(`Error saving game modes: ${modesError.message}`);
-                    }
-                }
-            }
 
             // 5. Link to Collection
             if (selectedCollectionId && gameData) {
@@ -252,15 +169,31 @@ export default function InstallGamePage() {
                             </h2>
 
                             <div className="space-y-6">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div className="space-y-2">
                                         <label className="text-sm font-medium text-gray-300 ml-1">Game Title</label>
                                         <input
                                             type="text"
                                             value={title}
-                                            onChange={(e) => setTitle(e.target.value)}
+                                            onChange={(e) => {
+                                                setTitle(e.target.value);
+                                                if (!slug || slug === title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')) {
+                                                    setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''));
+                                                }
+                                            }}
                                             className="w-full bg-black/20 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all"
                                             placeholder="e.g. Ludo Royale"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-gray-300 ml-1">Game Slug</label>
+                                        <input
+                                            type="text"
+                                            value={slug}
+                                            onChange={(e) => setSlug(e.target.value)}
+                                            className="w-full bg-black/20 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 transition-all font-mono"
+                                            placeholder="e.g. ludo-royale"
                                             required
                                         />
                                     </div>
@@ -350,331 +283,7 @@ export default function InstallGamePage() {
                             </div>
                         </div>
 
-                        {/* Game Modes Section - Fixed Tabs */}
-                        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 space-y-8 shadow-2xl">
-                            <h2 className="text-xl font-bold flex items-center gap-3 text-blue-400">
-                                <div className="p-2 rounded-lg bg-blue-500/20">
-                                    <Coins className="w-5 h-5" />
-                                </div>
-                                Game Modes & Pricing
-                            </h2>
 
-                            {/* Mode Tabs */}
-                            <div className="flex gap-2 border-b border-white/10 pb-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('online')}
-                                    className={`flex items-center gap-2 px-6 py-3 rounded-t-xl font-medium transition-all ${activeTab === 'online'
-                                        ? 'bg-blue-500/20 text-blue-400 border-b-2 border-blue-500'
-                                        : 'text-gray-500 hover:text-gray-300'
-                                        }`}
-                                >
-                                    <Trophy className="w-4 h-4" />
-                                    Online
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('room')}
-                                    className={`flex items-center gap-2 px-6 py-3 rounded-t-xl font-medium transition-all ${activeTab === 'room'
-                                        ? 'bg-purple-500/20 text-purple-400 border-b-2 border-purple-500'
-                                        : 'text-gray-500 hover:text-gray-300'
-                                        }`}
-                                >
-                                    <Users className="w-4 h-4" />
-                                    Game Room
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('practice')}
-                                    className={`flex items-center gap-2 px-6 py-3 rounded-t-xl font-medium transition-all ${activeTab === 'practice'
-                                        ? 'bg-green-500/20 text-green-400 border-b-2 border-green-500'
-                                        : 'text-gray-500 hover:text-gray-300'
-                                        }`}
-                                >
-                                    <Cpu className="w-4 h-4" />
-                                    Practice
-                                </button>
-                            </div>
-
-                            {/* Tab Content */}
-                            <div className="min-h-[300px]">
-                                {/* Online Mode Tab */}
-                                {activeTab === 'online' && (
-                                    <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <div className="flex items-center justify-between p-4 bg-blue-500/10 rounded-xl border border-blue-500/20">
-                                            <div className="flex items-center gap-3">
-                                                <Trophy className="w-6 h-6 text-blue-400" />
-                                                <div>
-                                                    <div className="font-bold text-white">Online Ranked Mode</div>
-                                                    <div className="text-sm text-gray-400">Competitive matchmaking with leaderboard</div>
-                                                </div>
-                                            </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={onlineEnabled}
-                                                    onChange={(e) => setOnlineEnabled(e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-500"></div>
-                                            </label>
-                                        </div>
-
-                                        {onlineEnabled && (
-                                            <div className="space-y-6 pl-4">
-                                                <div className="grid grid-cols-2 gap-6">
-                                                    <div className="space-y-2">
-                                                        <label className="text-sm font-medium text-gray-300">Entry Fee (Coins)</label>
-                                                        <input
-                                                            type="number"
-                                                            value={onlineEntryFee}
-                                                            onChange={(e) => setOnlineEntryFee(parseFloat(e.target.value) || 0)}
-                                                            className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                                            min="0"
-                                                        />
-                                                        <p className="text-xs text-gray-500">Cost per player to join</p>
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <div className="space-y-2">
-                                                            <label className="text-sm font-medium text-gray-300">Min Players</label>
-                                                            <input
-                                                                type="number"
-                                                                value={onlineMinPlayers}
-                                                                onChange={(e) => setOnlineMinPlayers(parseInt(e.target.value) || 2)}
-                                                                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                                                min="2"
-                                                                max={onlineMaxPlayers}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-sm font-medium text-gray-300">Max Players</label>
-                                                            <input
-                                                                type="number"
-                                                                value={onlineMaxPlayers}
-                                                                onChange={(e) => setOnlineMaxPlayers(parseInt(e.target.value) || 4)}
-                                                                className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                                                min={onlineMinPlayers}
-                                                                max="1000"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-3">
-                                                    <label className="text-sm font-medium text-gray-300">Prize Distribution (%)</label>
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                        <div className="space-y-2">
-                                                            <label className="text-xs text-gray-400">1st Place</label>
-                                                            <div className="relative">
-                                                                <input
-                                                                    type="number"
-                                                                    value={onlinePrize1st}
-                                                                    onChange={(e) => setOnlinePrize1st(parseFloat(e.target.value) || 0)}
-                                                                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pr-8 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                                                    min="0"
-                                                                    max="100"
-                                                                />
-                                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">%</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-xs text-gray-400">2nd Place</label>
-                                                            <div className="relative">
-                                                                <input
-                                                                    type="number"
-                                                                    value={onlinePrize2nd}
-                                                                    onChange={(e) => setOnlinePrize2nd(parseFloat(e.target.value) || 0)}
-                                                                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pr-8 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                                                    min="0"
-                                                                    max="100"
-                                                                />
-                                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">%</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-xs text-gray-400">3rd Place</label>
-                                                            <div className="relative">
-                                                                <input
-                                                                    type="number"
-                                                                    value={onlinePrize3rd}
-                                                                    onChange={(e) => setOnlinePrize3rd(parseFloat(e.target.value) || 0)}
-                                                                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pr-8 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                                                    min="0"
-                                                                    max="100"
-                                                                />
-                                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">%</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="space-y-2">
-                                                            <label className="text-xs text-gray-400">4th Place</label>
-                                                            <div className="relative">
-                                                                <input
-                                                                    type="number"
-                                                                    value={onlinePrize4th}
-                                                                    onChange={(e) => setOnlinePrize4th(parseFloat(e.target.value) || 0)}
-                                                                    className="w-full bg-black/30 border border-white/10 rounded-xl px-4 py-3 pr-8 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
-                                                                    min="0"
-                                                                    max="100"
-                                                                />
-                                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">%</span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <p className="text-xs text-gray-500">
-                                                        Total: {onlinePrize1st + onlinePrize2nd + onlinePrize3rd + onlinePrize4th}%
-                                                        {(onlinePrize1st + onlinePrize2nd + onlinePrize3rd + onlinePrize4th) === 100 ?
-                                                            <span className="text-green-400 ml-2">✓ Valid</span> :
-                                                            <span className="text-yellow-400 ml-2">⚠ Should equal 100%</span>
-                                                        }
-                                                    </p>
-                                                </div>
-
-                                                <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
-                                                    <div className="flex items-start gap-3">
-                                                        <Trophy className="w-5 h-5 text-blue-400 mt-0.5" />
-                                                        <div className="text-sm text-gray-300">
-                                                            <strong className="text-blue-400">Example:</strong> With {onlineMaxPlayers} players at {onlineEntryFee} coins each = {onlineMaxPlayers * onlineEntryFee} coins total pool.
-                                                            1st gets {Math.floor(onlineMaxPlayers * onlineEntryFee * onlinePrize1st / 100)} coins ({onlinePrize1st}%),
-                                                            2nd gets {Math.floor(onlineMaxPlayers * onlineEntryFee * onlinePrize2nd / 100)} coins ({onlinePrize2nd}%).
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="p-4 bg-blue-500/5 border border-blue-500/20 rounded-xl">
-                                                    <div className="flex items-start gap-3">
-                                                        <Trophy className="w-5 h-5 text-blue-400 mt-0.5" />
-                                                        <div className="text-sm text-gray-300">
-                                                            <strong className="text-blue-400">Leaderboard:</strong> This mode always affects the global leaderboard. Winners gain ranking points.
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Game Room Tab */}
-                                {activeTab === 'room' && (
-                                    <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <div className="flex items-center justify-between p-4 bg-purple-500/10 rounded-xl border border-purple-500/20">
-                                            <div className="flex items-center gap-3">
-                                                <Users className="w-6 h-6 text-purple-400" />
-                                                <div>
-                                                    <div className="font-bold text-white">Friend Room Mode</div>
-                                                    <div className="text-sm text-gray-400">Private rooms for playing with friends</div>
-                                                </div>
-                                            </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={roomEnabled}
-                                                    onChange={(e) => setRoomEnabled(e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-500"></div>
-                                            </label>
-                                        </div>
-
-                                        {roomEnabled && (
-                                            <div className="space-y-6 pl-4">
-                                                <div className="p-4 bg-purple-500/5 border border-purple-500/20 rounded-xl space-y-3">
-                                                    <div className="flex items-start gap-3">
-                                                        <Users className="w-5 h-5 text-purple-400 mt-0.5" />
-                                                        <div className="text-sm text-gray-300">
-                                                            <strong className="text-purple-400">User Controlled:</strong> Players create rooms and decide their own stakes and rules.
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-start gap-3">
-                                                        <Coins className="w-5 h-5 text-purple-400 mt-0.5" />
-                                                        <div className="text-sm text-gray-300">
-                                                            <strong className="text-purple-400">Flexible Betting:</strong> Users can choose to play for free or set custom coin amounts.
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-start gap-3">
-                                                        <X className="w-5 h-5 text-purple-400 mt-0.5" />
-                                                        <div className="text-sm text-gray-300">
-                                                            <strong className="text-purple-400">No Leaderboard Impact:</strong> Friend room matches are casual and don't affect global rankings.
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* Practice Mode Tab */}
-                                {activeTab === 'practice' && (
-                                    <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                                        <div className="flex items-center justify-between p-4 bg-green-500/10 rounded-xl border border-green-500/20">
-                                            <div className="flex items-center gap-3">
-                                                <Cpu className="w-6 h-6 text-green-400" />
-                                                <div>
-                                                    <div className="font-bold text-white">Practice Mode</div>
-                                                    <div className="text-sm text-gray-400">Play against computer for free</div>
-                                                </div>
-                                            </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={practiceEnabled}
-                                                    onChange={(e) => setPracticeEnabled(e.target.checked)}
-                                                    className="sr-only peer"
-                                                />
-                                                <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500"></div>
-                                            </label>
-                                        </div>
-
-                                        {practiceEnabled && (
-                                            <div className="space-y-4 pl-4">
-                                                <div className="p-4 bg-green-500/5 border border-green-500/20 rounded-xl space-y-3">
-                                                    <div className="flex items-start gap-3">
-                                                        <Coins className="w-5 h-5 text-green-400 mt-0.5" />
-                                                        <div className="text-sm text-gray-300">
-                                                            <strong className="text-green-400">Always Free:</strong> No coins required or awarded
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-start gap-3">
-                                                        <X className="w-5 h-5 text-green-400 mt-0.5" />
-                                                        <div className="text-sm text-gray-300">
-                                                            <strong className="text-green-400">No Leaderboard:</strong> Practice matches don't affect rankings
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-start gap-3">
-                                                        <Cpu className="w-5 h-5 text-green-400 mt-0.5" />
-                                                        <div className="text-sm text-gray-300">
-                                                            <strong className="text-green-400">Offline Play:</strong> Game handles AI opponent internally
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-                                                    <div className="text-xs text-yellow-400">
-                                                        ℹ️ <strong>Note:</strong> The game must implement its own AI/computer opponent. The portal only launches the game without a session token.
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Global Leaderboard Toggle */}
-                            <div className="pt-6 border-t border-white/10">
-                                <label className="flex items-center gap-3 cursor-pointer p-4 bg-black/20 rounded-xl border border-white/10 hover:bg-black/30 transition-all">
-                                    <input
-                                        type="checkbox"
-                                        checked={hasLeaderboard}
-                                        onChange={(e) => setHasLeaderboard(e.target.checked)}
-                                        className="w-5 h-5 rounded bg-black/30 border-white/10 text-yellow-500 focus:ring-yellow-500/50"
-                                    />
-                                    <Trophy className="w-5 h-5 text-yellow-400" />
-                                    <div>
-                                        <div className="text-sm font-medium text-white">Enable Global Leaderboard</div>
-                                        <div className="text-xs text-gray-400">Track and display top players for this game</div>
-                                    </div>
-                                </label>
-                            </div>
-                        </div>
 
                         {/* Publishing Section */}
                         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 space-y-8 shadow-2xl">

@@ -9,13 +9,13 @@ import {
     Gamepad2,
     Calendar,
     Loader2,
-    Activity,
-    Play,
+    Clock,
     Users2,
-    Search,
+    Menu,
+    Flame,
+    Timer,
     ChevronRight,
-    Star,
-    Award
+    Sparkles
 } from "lucide-react";
 import Sidebar from "@/components/dashboard/Sidebar";
 
@@ -24,6 +24,7 @@ interface Game {
     title: string;
     thumbnail_url: string | null;
     game_url: string | null;
+    game_image_url?: string | null;
 }
 
 interface Tournament {
@@ -31,60 +32,72 @@ interface Tournament {
     title: string;
     description: string | null;
     game_id: string;
-    start_date: string;
-    end_date: string;
-    is_active: boolean;
+    start_at: string;
+    end_at: string;
+    status: string;
     created_at: string;
     game?: Game;
 }
 
-interface LeaderboardEntry {
-    id: string;
-    user_id: string;
-    score: number;
-    updated_at: string;
-    profile?: {
-        id: string;
-        full_name: string;
-        username: string;
-        avatar_url: string | null;
-    };
+function getTimeRemaining(dateStr: string): string {
+    const now = new Date().getTime();
+    const target = new Date(dateStr).getTime();
+    const diff = target - now;
+
+    if (diff <= 0) return "Ended";
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (days > 0) return `${days}d ${hours}h`;
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
 }
 
-export default function UserLeaderboardPage() {
+function getCountdown(start: string): string {
+    const now = new Date().getTime();
+    const target = new Date(start).getTime();
+    const diff = target - now;
+
+    if (diff <= 0) return "Starting soon";
+
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+
+    if (days > 0) return `Starts in ${days}d ${hours}h`;
+    if (hours > 0) return `Starts in ${hours}h`;
+    return `Starting soon`;
+}
+
+export default function TournamentsPage() {
     const router = useRouter();
-    const [user, setUser] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [tournaments, setTournaments] = useState<Tournament[]>([]);
-    const [selectedTournament, setSelectedTournament] = useState<Tournament | null>(null);
-    const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-    const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
-    const [userEntry, setUserEntry] = useState<LeaderboardEntry | null>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [filterTab, setFilterTab] = useState<"active" | "upcoming" | "completed">("active");
 
     useEffect(() => {
         const init = async () => {
-            const { data: { user: currentUser } } = await supabase.auth.getUser();
-            if (!currentUser) {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
                 router.push("/");
                 return;
             }
-            setUser(currentUser);
-            await fetchTournaments(currentUser.id);
+            await fetchTournaments();
             setLoading(false);
         };
         init();
     }, [router]);
 
-    const fetchTournaments = async (userId: string) => {
+    const fetchTournaments = async () => {
         const { data, error } = await supabase
             .from("tournaments")
             .select(`
                 *,
-                game:games(id, title, thumbnail_url, game_url)
+                game:games(id, title, thumbnail_url, game_url, game_image_url)
             `)
-            .eq("is_active", true)
-            .order("end_date", { ascending: true });
+            .order("created_at", { ascending: false });
 
         if (error) {
             console.error("Error fetching tournaments:", error);
@@ -92,103 +105,18 @@ export default function UserLeaderboardPage() {
         }
 
         setTournaments(data || []);
-
-        // Default select first active tournament
-        if (data && data.length > 0) {
-            setSelectedTournament(data[0]);
-            fetchLeaderboard(data[0].id, userId);
-        }
     };
 
-    const fetchLeaderboard = async (tournamentId: string, userId: string) => {
-        setLoadingLeaderboard(true);
-        try {
-            const { data, error } = await supabase
-                .from("tournament_leaderboard")
-                .select(`
-                    id, user_id, score, updated_at,
-                    profile:profiles(id, full_name, username, avatar_url)
-                `)
-                .eq("tournament_id", tournamentId)
-                .order("score", { ascending: false });
+    const filtered = tournaments.filter((t) => {
+        if (filterTab === "upcoming") return t.status === "upcoming";
+        if (filterTab === "completed") return t.status === "ended";
+        return t.status === "active";
+    });
 
-            if (error) throw error;
-
-            const formatted = (data || []).map((entry: any) => ({
-                ...entry,
-                profile: Array.isArray(entry.profile) ? entry.profile[0] : entry.profile
-            }));
-
-            setLeaderboard(formatted);
-
-            // Find current user's entry
-            const mine = formatted.find((entry) => entry.user_id === userId);
-            setUserEntry(mine || null);
-        } catch (err) {
-            console.error("Error fetching tournament leaderboard:", err);
-        } finally {
-            setLoadingLeaderboard(false);
-        }
-    };
-
-    const handleSelectTournament = (t: Tournament) => {
-        if (!user) return;
-        setSelectedTournament(t);
-        fetchLeaderboard(t.id, user.id);
-    };
-
-    const handlePlayTournament = async () => {
-        if (!selectedTournament || !selectedTournament.game || !selectedTournament.game.game_url || !user) return;
-        const game = selectedTournament.game;
-        
-        try {
-            // Create a game room linking to this tournament
-            const roomId = crypto.randomUUID();
-            const joinCode = `TOUR-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-
-            // Increment plays count in DB
-            await supabase.rpc('increment_game_plays', { p_game_id: game.id });
-
-            // Insert game_room record
-            const { error: roomErr } = await supabase.from('game_rooms').insert({
-                id: roomId,
-                name: `Tournament: ${selectedTournament.title}`,
-                host_id: user.id,
-                game_id: game.id,
-                mode: 'practice', // use practice mode since it's a single player run
-                status: 'live',
-                stake_amount: 0,
-                join_code: joinCode,
-                max_players: 1,
-                tournament_id: selectedTournament.id // Link to tournament!
-            });
-
-            if (roomErr) throw roomErr;
-
-            // Insert room_player record
-            const { error: playerErr } = await supabase.from('room_players').insert({
-                room_id: roomId,
-                user_id: user.id,
-                status: 'joined',
-                is_ready: true
-            });
-
-            if (playerErr) throw playerErr;
-
-            // Route to play page
-            router.push(`/dashboard/play/${roomId}`);
-        } catch (err) {
-            console.error("Error launching tournament session:", err);
-            alert("Failed to start tournament session");
-        }
-    };
-
-    const isUpcoming = (t: Tournament) => {
-        return new Date() < new Date(t.start_date);
-    };
-
-    const isEnded = (t: Tournament) => {
-        return new Date() > new Date(t.end_date);
+    const tabCounts = {
+        active: tournaments.filter((t) => t.status === "active").length,
+        upcoming: tournaments.filter((t) => t.status === "upcoming").length,
+        completed: tournaments.filter((t) => t.status === "ended").length,
     };
 
     if (loading) {
@@ -201,239 +129,215 @@ export default function UserLeaderboardPage() {
 
     return (
         <div className="flex h-screen bg-slate-50 text-slate-900 font-sans overflow-hidden">
-            <Sidebar 
-                currentActiveId="leaderboard" 
+            <Sidebar
+                currentActiveId="leaderboard"
                 isOpen={isSidebarOpen}
                 onClose={() => setIsSidebarOpen(false)}
             />
 
-            <div className="flex-1 flex flex-col overflow-hidden bg-slate-50 relative">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[400px] bg-purple-600/5 blur-[120px] rounded-full pointer-events-none" />
+            <div className="flex-1 flex flex-col overflow-hidden relative">
+                {/* Ambient glow */}
+                <div className="absolute top-0 left-1/3 w-[600px] h-[400px] bg-purple-600/5 blur-[150px] rounded-full pointer-events-none" />
+                <div className="absolute bottom-0 right-1/4 w-[400px] h-[300px] bg-indigo-600/4 blur-[120px] rounded-full pointer-events-none" />
 
-                {/* Main page content area */}
+                {/* Top Bar */}
+                <header className="h-12 flex-shrink-0 bg-white/80 backdrop-blur-xl border-b border-slate-200 flex items-center px-5 gap-3 z-20">
+                    <button
+                        onClick={() => setIsSidebarOpen(true)}
+                        className="md:hidden p-2 -ml-2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                    >
+                        <Menu className="w-5 h-5" />
+                    </button>
+                    <div className="flex items-center gap-2">
+                        <Trophy className="w-4 h-4 text-purple-600" />
+                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Tournaments</span>
+                    </div>
+                    <div className="ml-auto flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span>Online</span>
+                        </div>
+                    </div>
+                </header>
+
                 <div className="flex-1 flex flex-col relative z-10 overflow-hidden">
-                    {/* Header */}
-                    <header className="pt-16 pb-8 px-8 md:px-12 border-b border-slate-200 shrink-0">
-                        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-6">
-                            <div>
-                                <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-2 uppercase italic">
-                                    Tournaments
-                                </h1>
-                                <p className="text-slate-500 font-bold text-[10px] uppercase tracking-[0.2em]">
-                                    Play games against the computer and fight for the top rank on the leaderboard
-                                </p>
-                            </div>
-                        </div>
-                    </header>
+                    {/* Hero Header */}
+                    <div className="pt-8 pb-6 px-6 md:px-10 shrink-0">
+                        <div className="max-w-6xl mx-auto">
+                            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                                <div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-600/20">
+                                            <Sparkles className="w-4 h-4 text-white" />
+                                        </div>
+                                        <span className="text-[10px] font-bold text-purple-600 uppercase tracking-[0.2em]">
+                                            Compete & Win
+                                        </span>
+                                    </div>
+                                    <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight leading-none mb-2">
+                                        Tournaments
+                                    </h1>
+                                    <p className="text-slate-500 text-sm font-medium max-w-md">
+                                        Play your favourite games and climb the leaderboard. Only your highest score counts.
+                                    </p>
+                                </div>
 
-                    {tournaments.length === 0 ? (
-                        <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-                            <div className="w-24 h-24 rounded-[32px] bg-purple-50 flex items-center justify-center border border-purple-200/50 mb-6 shadow-sm">
-                                <Trophy className="w-10 h-10 text-purple-500/40" />
+                                {/* Stats row */}
+                                <div className="flex items-center gap-3">
+                                    <div className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Active</p>
+                                        <p className="text-lg font-black text-emerald-600 leading-tight">{tabCounts.active}</p>
+                                    </div>
+                                    <div className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Upcoming</p>
+                                        <p className="text-lg font-black text-blue-600 leading-tight">{tabCounts.upcoming}</p>
+                                    </div>
+                                    <div className="px-4 py-2.5 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Ended</p>
+                                        <p className="text-lg font-black text-slate-400 leading-tight">{tabCounts.completed}</p>
+                                    </div>
+                                </div>
                             </div>
-                            <h3 className="text-2xl font-black text-slate-800 mb-3 uppercase tracking-tight italic">No Active Tournaments</h3>
-                            <p className="text-slate-400 font-bold text-xs max-w-xs uppercase tracking-widest leading-relaxed">
-                                Check back later! Administrators will schedule new tournaments soon.
-                            </p>
+
+                            {/* Filter Tabs */}
+                            <div className="flex gap-1 mt-6 bg-slate-100 rounded-2xl p-1 border border-slate-200 w-fit">
+                                {(["active", "upcoming", "completed"] as const).map((tab) => (
+                                    <button
+                                        key={tab}
+                                        onClick={() => setFilterTab(tab)}
+                                        className={`px-5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                                            filterTab === tab
+                                                ? "bg-white text-purple-700 shadow-sm border border-slate-200"
+                                                : "text-slate-400 hover:text-slate-600"
+                                        }`}
+                                    >
+                                        {tab === "completed" ? "Ended" : tab}
+                                        <span className={`ml-1.5 text-[10px] ${
+                                            filterTab === tab ? "text-purple-400" : "text-slate-300"
+                                        }`}>
+                                            {tabCounts[tab]}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
                         </div>
-                    ) : (
-                        <div className="flex-1 flex overflow-hidden max-w-6xl w-full mx-auto px-4 md:px-8 pb-10 gap-6 mt-6">
-                            {/* Tournaments List (Left Panel) */}
-                            <div className="w-1/2 flex flex-col overflow-hidden bg-white border border-slate-200 shadow-sm rounded-[32px] p-6">
-                                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">
-                                    Active Tournaments ({tournaments.length})
-                                </h3>
-                                <div className="flex-1 overflow-y-auto space-y-3 pr-2 no-scrollbar">
-                                    {tournaments.map((t) => {
-                                        const isSelected = selectedTournament?.id === t.id;
-                                        const upcoming = isUpcoming(t);
-                                        const ended = isEnded(t);
-                                        
+                    </div>
+
+                    {/* Tournament Cards Grid */}
+                    <div className="flex-1 overflow-y-auto px-6 md:px-10 pb-8 no-scrollbar">
+                        <div className="max-w-6xl mx-auto">
+                            {filtered.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center text-center py-24">
+                                    <div className="w-20 h-20 rounded-3xl bg-purple-50 border border-purple-100 flex items-center justify-center mb-5">
+                                        <Trophy className="w-8 h-8 text-purple-300" />
+                                    </div>
+                                    <h3 className="text-lg font-bold text-slate-600 mb-2">
+                                        No {filterTab} tournaments
+                                    </h3>
+                                    <p className="text-slate-400 text-sm max-w-xs">
+                                        {filterTab === "active"
+                                            ? "No tournaments are live right now. Check upcoming for scheduled ones."
+                                            : filterTab === "upcoming"
+                                                ? "No tournaments scheduled yet. Check back later!"
+                                                : "No completed tournaments to show."}
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                                    {filtered.map((t) => {
+                                        const bannerUrl = t.game?.game_image_url || t.game?.thumbnail_url;
+                                        const isActive = t.status === "active";
+                                        const isUpcoming = t.status === "upcoming";
+
                                         return (
                                             <div
                                                 key={t.id}
-                                                onClick={() => handleSelectTournament(t)}
-                                                className={`group p-4 rounded-2xl border transition-all cursor-pointer flex gap-4 ${
-                                                    isSelected
-                                                        ? "bg-purple-50 border-purple-300 shadow-sm"
-                                                        : "bg-slate-50/50 border-slate-200/80 hover:bg-slate-50 hover:border-slate-300"
-                                                }`}
+                                                onClick={() => router.push(`/dashboard/leaderboard/${t.id}`)}
+                                                className="group bg-white border border-slate-200 hover:border-purple-300 rounded-3xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-purple-600/5 hover:-translate-y-0.5"
                                             >
-                                                {/* Game Thumbnail */}
-                                                <div className="w-16 h-16 rounded-xl relative overflow-hidden bg-purple-50 flex-shrink-0 border border-slate-200">
-                                                    {t.game?.thumbnail_url ? (
-                                                        <Image src={t.game.thumbnail_url} alt="Game Thumbnail" fill className="object-cover" />
+                                                {/* Card Banner */}
+                                                <div className="relative h-40 overflow-hidden">
+                                                    {bannerUrl ? (
+                                                        <img
+                                                            src={bannerUrl}
+                                                            alt={t.game?.title || "Tournament"}
+                                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                                        />
                                                     ) : (
-                                                        <div className="w-full h-full flex items-center justify-center">
-                                                            <Gamepad2 className="w-6 h-6 text-purple-600/40" />
+                                                        <div className="w-full h-full bg-gradient-to-br from-purple-100 to-indigo-100 flex items-center justify-center">
+                                                            <Gamepad2 className="w-10 h-10 text-purple-300" />
                                                         </div>
                                                     )}
-                                                </div>
+                                                    {/* Gradient overlay */}
+                                                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
 
-                                                <div className="flex-1 min-w-0 flex flex-col justify-between">
-                                                    <div>
-                                                        <h4 className="font-black text-base text-slate-900 truncate leading-tight uppercase italic group-hover:text-purple-600 transition-colors">
-                                                            {t.title}
-                                                        </h4>
-                                                        <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block mt-1">
-                                                            Game: {t.game?.title || "Unknown"}
+                                                    {/* Status badge */}
+                                                    <div className="absolute top-3 left-3">
+                                                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border ${
+                                                            isActive
+                                                                ? "bg-emerald-500/90 text-white border-emerald-400/50"
+                                                                : isUpcoming
+                                                                    ? "bg-blue-500/90 text-white border-blue-400/50"
+                                                                    : "bg-slate-600/80 text-white border-slate-500/50"
+                                                        }`}>
+                                                            {isActive && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                                                            {isActive ? "Live" : isUpcoming ? "Upcoming" : "Ended"}
                                                         </span>
                                                     </div>
 
-                                                    <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold uppercase tracking-wider mt-2">
-                                                        <div className="flex items-center gap-1">
-                                                            <Calendar className="w-3.5 h-3.5" />
-                                                            <span>Ends {new Date(t.end_date).toLocaleDateString()}</span>
+                                                    {/* Game tag */}
+                                                    <div className="absolute bottom-3 left-3">
+                                                        <span className="text-[10px] font-bold text-white bg-black/40 backdrop-blur-sm px-2 py-0.5 rounded-lg">
+                                                            {t.game?.title || "Unknown Game"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Card Body */}
+                                                <div className="p-5">
+                                                    <h3 className="text-base font-bold text-slate-800 group-hover:text-purple-700 transition-colors leading-snug mb-2 line-clamp-1">
+                                                        {t.title}
+                                                    </h3>
+                                                    <p className="text-xs text-slate-400 line-clamp-2 mb-4 leading-relaxed">
+                                                        {t.description || "No description provided."}
+                                                    </p>
+
+                                                    {/* Footer meta */}
+                                                    <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                                                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium">
+                                                            {isActive ? (
+                                                                <>
+                                                                    <Timer className="w-3 h-3 text-amber-500" />
+                                                                    <span className="text-amber-600">
+                                                                        {t.end_at ? getTimeRemaining(t.end_at) + " left" : "Open-ended"}
+                                                                    </span>
+                                                                </>
+                                                            ) : isUpcoming ? (
+                                                                <>
+                                                                    <Clock className="w-3 h-3 text-blue-500" />
+                                                                    <span className="text-blue-600">{getCountdown(t.start_at)}</span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Calendar className="w-3 h-3" />
+                                                                    <span>Ended {t.end_at ? new Date(t.end_at).toLocaleDateString() : ""}</span>
+                                                                </>
+                                                            )}
                                                         </div>
-                                                        {upcoming && (
-                                                            <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">Upcoming</span>
-                                                        )}
-                                                        {ended && (
-                                                            <span className="text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">Ended</span>
-                                                        )}
-                                                        {!upcoming && !ended && (
-                                                            <span className="text-green-600 bg-green-50 px-2 py-0.5 rounded border border-green-200">Active</span>
-                                                        )}
+
+                                                        <div className="flex items-center gap-1 text-slate-300 group-hover:text-purple-500 transition-colors">
+                                                            <span className="text-[10px] font-bold uppercase tracking-wider">View</span>
+                                                            <ChevronRight className="w-3.5 h-3.5" />
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         );
                                     })}
                                 </div>
-                            </div>
-
-                            {/* Leaderboard Details (Right Panel) */}
-                            <div className="w-1/2 flex flex-col overflow-hidden bg-white border border-slate-200 shadow-sm rounded-[32px]">
-                                {selectedTournament ? (
-                                    <div className="flex-1 flex flex-col overflow-hidden">
-                                        {/* Tournament Details Banner */}
-                                        <div className="p-6 border-b border-slate-200 bg-slate-50/50 shrink-0">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <div className="flex items-center gap-2 text-yellow-600">
-                                                    <Trophy className="w-4 h-4 fill-current" />
-                                                    <span className="text-xs font-black uppercase tracking-wider">Tournament Standing</span>
-                                                </div>
-                                                
-                                                {/* Play Button */}
-                                                {!isUpcoming(selectedTournament) && !isEnded(selectedTournament) && selectedTournament.game?.game_url && (
-                                                    <button
-                                                        onClick={handlePlayTournament}
-                                                        className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-[10px] uppercase tracking-wider rounded-xl shadow-sm flex items-center gap-1.5 active:scale-95 transition-all cursor-pointer"
-                                                    >
-                                                        <Play className="w-3.5 h-3.5 fill-current" /> Play Tournament
-                                                    </button>
-                                                )}
-                                            </div>
-
-                                            <h2 className="text-xl font-black text-slate-900 uppercase italic leading-none mb-1.5">{selectedTournament.title}</h2>
-                                            <p className="text-xs text-slate-500 font-medium leading-relaxed line-clamp-2">{selectedTournament.description || "No rules or description provided."}</p>
-                                        
-                                            {/* User's own score card */}
-                                            {userEntry ? (
-                                                <div className="mt-4 p-3.5 rounded-2xl bg-purple-50 border border-purple-100 shadow-sm flex items-center justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <Award className="w-5 h-5 text-purple-600" />
-                                                        <div>
-                                                            <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Your High Score</p>
-                                                            <p className="text-base font-black text-purple-700 leading-tight">{userEntry.score.toLocaleString()} points</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right">
-                                                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Leaderboard Rank</p>
-                                                        <p className="text-base font-black text-slate-800 leading-tight">
-                                                            #{leaderboard.findIndex((e) => e.user_id === user?.id) + 1}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="mt-4 p-3.5 rounded-2xl bg-slate-50 border border-slate-200 text-center">
-                                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">
-                                                        You haven't played in this tournament yet!
-                                                    </p>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Leaderboard Rankings List */}
-                                        <div className="flex-1 overflow-y-auto p-6 space-y-2.5 no-scrollbar">
-                                            {loadingLeaderboard ? (
-                                                <div className="flex justify-center py-20">
-                                                    <Loader2 className="w-6 h-6 text-purple-600 animate-spin" />
-                                                </div>
-                                            ) : leaderboard.length === 0 ? (
-                                                <div className="text-center py-20 text-slate-400 text-xs font-bold uppercase tracking-widest leading-relaxed">
-                                                    <Activity className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                                                    No submissions yet. Be the first to enter!
-                                                </div>
-                                            ) : (
-                                                leaderboard.map((entry, index) => {
-                                                    const name = entry.profile?.full_name || entry.profile?.username || "Gamer";
-                                                    const username = entry.profile?.username ? `@${entry.profile.username}` : "Gamer";
-                                                    const isMe = entry.user_id === user?.id;
-
-                                                    // Medal colors
-                                                    const medalBg = index === 0 
-                                                        ? "bg-yellow-50 border border-yellow-200 text-yellow-600 shadow-sm" 
-                                                        : index === 1 
-                                                            ? "bg-slate-50 border border-slate-200 text-slate-600 shadow-sm"
-                                                            : index === 2 
-                                                                ? "bg-amber-50 border border-amber-200 text-amber-700 shadow-sm" 
-                                                                : "bg-slate-50 border border-slate-200 text-slate-600 shadow-sm";
-
-                                                    return (
-                                                        <div
-                                                            key={entry.id}
-                                                            className={`flex items-center justify-between p-4 rounded-xl border transition-all ${
-                                                                isMe 
-                                                                    ? "bg-purple-50 border-purple-200" 
-                                                                    : "bg-white border-b border-slate-100 hover:bg-slate-50"
-                                                            }`}
-                                                        >
-                                                            <div className="flex items-center gap-4">
-                                                                {/* Rank Badge */}
-                                                                <div className={`w-8 h-8 rounded-lg border flex items-center justify-center font-bold text-sm ${medalBg}`}>
-                                                                    {index + 1}
-                                                                </div>
-
-                                                                {/* User Profile */}
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-xs font-black text-white overflow-hidden relative border border-slate-200 shadow-sm">
-                                                                        {entry.profile?.avatar_url ? (
-                                                                            <img src={entry.profile.avatar_url} alt={name} className="object-cover w-full h-full" />
-                                                                        ) : (
-                                                                            name[0]?.toUpperCase()
-                                                                        )}
-                                                                    </div>
-                                                                    <div>
-                                                                        <h4 className="font-bold text-sm text-slate-800">
-                                                                            {name} {isMe && <span className="text-[10px] text-purple-600 font-bold bg-purple-100 border border-purple-200 px-1.5 py-0.5 rounded-full ml-1">YOU</span>}
-                                                                        </h4>
-                                                                        <p className="text-[10px] text-slate-500">{username}</p>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-
-                                                            <div className="text-right">
-                                                                <div className="text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">
-                                                                    {entry.score.toLocaleString()}
-                                                                </div>
-                                                                <p className="text-[8px] text-slate-400 uppercase font-bold tracking-wider mt-0.5">Points</p>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })
-                                            )}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs font-bold uppercase tracking-widest">
-                                        <Trophy className="w-10 h-10 text-slate-300 mb-4" />
-                                        Select a tournament to inspect leaderboard rankings.
-                                    </div>
-                                )}
-                            </div>
+                            )}
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
         </div>
