@@ -54,6 +54,7 @@ export default function GameDetailPage() {
     const [isFavourited, setIsFavourited] = useState(false);
     const [favouriteLoading, setFavouriteLoading] = useState(false);
     const [shared, setShared] = useState(false);
+    const [personalBest, setPersonalBest] = useState<number | null>(null);
 
     // Rating state
     const [userRating, setUserRating] = useState<number>(0);
@@ -127,6 +128,20 @@ export default function GameDetailPage() {
                 setRatingCount(ratingsData.length);
                 const mine = ratingsData.find(r => r.user_id === user.id);
                 if (mine) setUserRating(mine.rating);
+            }
+
+            // Fetch user's personal best score in practice mode for this game
+            const { data: scoreSessions } = await supabase
+                .from("game_sessions")
+                .select("score")
+                .eq("game_id", gameId)
+                .eq("user_id", user.id)
+                .eq("mode", "practice")
+                .eq("status", "completed");
+
+            if (scoreSessions && scoreSessions.length > 0) {
+                const best = Math.max(...scoreSessions.map(s => Number(s.score || 0)));
+                setPersonalBest(best);
             }
 
             setLoading(false);
@@ -265,6 +280,8 @@ export default function GameDetailPage() {
                                         src={game.thumbnail_url}
                                         alt={game.title}
                                         fill
+                                        priority
+                                        sizes="100vw"
                                         className="object-cover opacity-40"
                                     />
                                 )}
@@ -377,6 +394,22 @@ export default function GameDetailPage() {
 
                                     {/* Stats sidebar */}
                                     <div className="space-y-3">
+                                        {/* Personal Best Score Card */}
+                                        <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl p-5 border border-slate-800 text-white shadow-lg relative overflow-hidden">
+                                            {/* Decorative radial light overlay */}
+                                            <div className="absolute -top-12 -right-12 w-28 h-28 bg-purple-500/20 rounded-full blur-2xl pointer-events-none animate-pulse" />
+                                            <div className="flex items-center gap-2 mb-2 text-yellow-400">
+                                                <Trophy className="w-4 h-4 fill-current" />
+                                                <span className="text-[10px] font-extrabold uppercase tracking-widest leading-none">Your High Score</span>
+                                            </div>
+                                            <p className="text-2xl font-black text-white tracking-tight">
+                                                {personalBest !== null ? `${personalBest.toLocaleString()} pts` : "0 pts"}
+                                            </p>
+                                            <p className="text-[10px] text-slate-400 mt-1.5 font-medium leading-normal">
+                                                {personalBest !== null ? "Practice more to set a new record!" : "Play to set your first score record!"}
+                                            </p>
+                                        </div>
+
                                         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
                                             <h2 className="text-sm font-bold text-slate-800 mb-4">Game Info</h2>
                                             <div className="space-y-3">

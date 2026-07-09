@@ -79,7 +79,6 @@ export default function UserDashboard() {
     const [selectedCollection, setSelectedCollection] = useState<string | null>(null);
     const [favouriteIds, setFavouriteIds] = useState<string[]>([]);
     const [realFriends, setRealFriends] = useState<any[]>([]);
-    const [pendingInvites, setPendingInvites] = useState<any[]>([]);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isFriendsCollapsed, setIsFriendsCollapsed] = useState(true);
     const router = useRouter();
@@ -161,18 +160,6 @@ export default function UserDashboard() {
                 }).filter(f => f.profiles);
                 setRealFriends(formatted);
 
-                // Fetch pending invites
-                const { data: invitesData } = await supabase
-                    .from("room_invites")
-                    .select(`
-                        id, status, created_at, room_id,
-                        room:rooms(id, name, code, status),
-                        inviter:profiles!inviter_id(full_name, username, avatar_url)
-                    `)
-                    .eq("invitee_id", user.id)
-                    .eq("status", "pending")
-                    .order("created_at", { ascending: false });
-                setPendingInvites(invitesData || []);
             } catch {
                 router.push("/");
             } finally {
@@ -184,56 +171,6 @@ export default function UserDashboard() {
         const favs = JSON.parse(localStorage.getItem("mg_favourites") || "[]");
         setFavouriteIds(favs);
     }, [router]);
-
-    // Real-time invites listener
-    useEffect(() => {
-        if (!user) return;
-        const channel = supabase
-            .channel(`dashboard-invites-${user.id}`)
-            .on("postgres_changes", {
-                event: "*",
-                schema: "public",
-                table: "room_invites",
-                filter: `invitee_id=eq.${user.id}`,
-            }, async (payload) => {
-                // Refresh invites
-                const { data } = await supabase
-                    .from("room_invites")
-                    .select(`
-                        id, status, created_at, room_id,
-                        room:rooms(id, name, code, status),
-                        inviter:profiles!inviter_id(full_name, username, avatar_url)
-                    `)
-                    .eq("invitee_id", user.id)
-                    .eq("status", "pending")
-                    .order("created_at", { ascending: false });
-                setPendingInvites(data || []);
-            })
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, [user]);
-
-    const handleAcceptInvite = async (invite: any) => {
-        await supabase.from("room_invites").update({ status: "accepted" }).eq("id", invite.id);
-        // Check if already in room
-        const { data: existing } = await supabase
-            .from("room_players")
-            .select("room_id")
-            .eq("room_id", invite.room_id)
-            .eq("user_id", user.id)
-            .maybeSingle();
-
-        if (!existing) {
-            await supabase.from("room_players").insert({ room_id: invite.room_id, user_id: user.id });
-        }
-        router.push("/dashboard/gameroom");
-    };
-
-    const handleDeclineInvite = async (inviteId: string) => {
-        await supabase.from("room_invites").update({ status: "declined" }).eq("id", inviteId);
-        setPendingInvites(prev => prev.filter(i => i.id !== inviteId));
-    };
 
     const handleLogout = async () => {
         await supabase.auth.signOut();

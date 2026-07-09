@@ -71,6 +71,16 @@ function getCountdown(start: string): string {
     return `Starting soon`;
 }
 
+function getTournamentActualStatus(startAt: string, endAt: string): "upcoming" | "active" | "ended" {
+    const now = new Date().getTime();
+    const start = new Date(startAt).getTime();
+    const end = new Date(endAt).getTime();
+    
+    if (now < start) return "upcoming";
+    if (now >= start && now < end) return "active";
+    return "ended";
+}
+
 export default function TournamentsPage() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
@@ -109,15 +119,16 @@ export default function TournamentsPage() {
     };
 
     const filtered = tournaments.filter((t) => {
-        if (filterTab === "upcoming") return t.status === "upcoming";
-        if (filterTab === "completed") return t.status === "ended";
-        return t.status === "active";
+        const actualStatus = getTournamentActualStatus(t.start_at, t.end_at);
+        if (filterTab === "upcoming") return actualStatus === "upcoming";
+        if (filterTab === "completed") return actualStatus === "ended";
+        return actualStatus === "active";
     });
 
     const tabCounts = {
-        active: tournaments.filter((t) => t.status === "active").length,
-        upcoming: tournaments.filter((t) => t.status === "upcoming").length,
-        completed: tournaments.filter((t) => t.status === "ended").length,
+        active: tournaments.filter((t) => getTournamentActualStatus(t.start_at, t.end_at) === "active").length,
+        upcoming: tournaments.filter((t) => getTournamentActualStatus(t.start_at, t.end_at) === "upcoming").length,
+        completed: tournaments.filter((t) => getTournamentActualStatus(t.start_at, t.end_at) === "ended").length,
     };
 
     if (loading) {
@@ -243,8 +254,9 @@ export default function TournamentsPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                     {filtered.map((t) => {
                                         const bannerUrl = t.game?.game_image_url || t.game?.thumbnail_url;
-                                        const isActive = t.status === "active";
-                                        const isUpcoming = t.status === "upcoming";
+                                        const actualStatus = getTournamentActualStatus(t.start_at, t.end_at);
+                                        const isActive = actualStatus === "active";
+                                        const isUpcoming = actualStatus === "upcoming";
 
                                         return (
                                             <div

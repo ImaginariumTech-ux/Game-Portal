@@ -154,7 +154,40 @@ The portal returns a JSON response indicating the submission status and player h
 
 ---
 
-## 3. What NOT to Build
+## 3. Real-Time UI Updates (Optional but Recommended)
+
+While the portal page automatically listens for database status updates, you can make the transition back to the game over screen instantaneous for the user by posting a message directly to the parent portal window when the match completes.
+
+This bypasses any database latency and displays the results screen instantly.
+
+### Implementation Example (HTML5 JavaScript)
+Trigger this message immediately after successfully dispatching your score submission call to the backend:
+
+```javascript
+window.parent.postMessage({
+  type: "MATCH_COMPLETE",
+  score: 10500 // The final score achieved by the player
+}, "*");
+```
+
+### Implementation Example (Unity C#)
+In Unity WebGL, you can call this via a JavaScript plugin or directly using `Application.ExternalCall` / `jslib`:
+
+```csharp
+// In your JS library (.jslib)
+mergeInto(LibraryManager.library, {
+    NotifyPortalMatchComplete: function (score) {
+        window.parent.postMessage(JSON.stringify({
+            type: "MATCH_COMPLETE",
+            score: score
+        }), "*");
+    }
+});
+```
+
+---
+
+## 4. What NOT to Build
 
 To minimize duplicate work and maintain layout consistency across the platform, developers must follow these development rules:
 1. **No Profile Systems:** Do not request, save, or store usernames, avatars, email addresses, or password credentials.
@@ -164,7 +197,7 @@ To minimize duplicate work and maintain layout consistency across the platform, 
 
 ---
 
-## 4. Per-Game Credentials Placeholder
+## 5. Per-Game Credentials Placeholder
 
 *This section will be manually configured by the portal administrator before this document is dispatched to your team:*
 
@@ -172,12 +205,14 @@ To minimize duplicate work and maintain layout consistency across the platform, 
 * **Game Title:** `[[ GAME_TITLE ]]`
 * **Private Webhook Secret:** `[[ WEBHOOK_SECRET ]]`
 
+---
+
 > [!CAUTION]
 > Your `webhook_secret` is a private signing key. Keep it secure and never commit it to public code repositories or expose it client-side.
 
 ---
 
-## 5. FAQ & Developer Reference
+## 6. FAQ & Developer Reference
 
 ### Q: How does player identity work?
 **A:** Player identity is managed entirely by the MagicGames Portal using Supabase Auth. The game retrieves user identities on load via `/api/game/init` and never interacts with player credentials or registration forms directly.

@@ -71,6 +71,36 @@ function getTimeRemaining(dateStr: string): string {
     return `${minutes}m remaining`;
 }
 
+function getCountdown(startAt: string): string {
+    const now = new Date().getTime();
+    const target = new Date(startAt).getTime();
+    const diff = target - now;
+    if (diff <= 0) return "Starting soon";
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    if (days > 0) return `Starts in ${days}d ${hours}h`;
+    if (hours > 0) return `Starts in ${hours}h ${minutes}m`;
+    return `Starts in ${minutes}m`;
+}
+
+function formatDateTime(dateStr: string): string {
+    const date = new Date(dateStr);
+    const datePart = date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const timePart = date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+    return `${datePart} at ${timePart}`;
+}
+
+function getTournamentActualStatus(startAt: string, endAt: string): "upcoming" | "active" | "ended" {
+    const now = new Date().getTime();
+    const start = new Date(startAt).getTime();
+    const end = new Date(endAt).getTime();
+    
+    if (now < start) return "upcoming";
+    if (now >= start && now < end) return "active";
+    return "ended";
+}
+
 export default function TournamentDetailPage() {
     const router = useRouter();
     const params = useParams();
@@ -148,6 +178,11 @@ export default function TournamentDetailPage() {
 
     const handlePlayTournament = async () => {
         if (!tournament || !tournament.game || !tournament.game.game_url || !user) return;
+        const actualStatus = getTournamentActualStatus(tournament.start_at, tournament.end_at);
+        if (actualStatus !== "active") {
+            toast.error("This tournament is not currently active.");
+            return;
+        }
         const game = tournament.game;
 
         try {
@@ -233,66 +268,77 @@ export default function TournamentDetailPage() {
                 {/* Scrollable Content */}
                 <div className="flex-1 overflow-y-auto no-scrollbar">
                     {/* Hero Banner */}
-                    <div className="relative w-full h-56 md:h-72 overflow-hidden">
-                        {bannerUrl ? (
-                            <img
-                                src={bannerUrl}
-                                alt={tournament.game?.title || "Tournament"}
-                                className="w-full h-full object-cover"
-                            />
-                        ) : (
-                            <div className="w-full h-full bg-gradient-to-br from-purple-200 to-indigo-200" />
-                        )}
-                        {/* Gradient overlays */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
-                        <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
+                    {(() => {
+                        const actualStatus = getTournamentActualStatus(tournament.start_at, tournament.end_at);
+                        return (
+                            <div className="relative w-full h-56 md:h-72 overflow-hidden">
+                                {bannerUrl ? (
+                                    <img
+                                        src={bannerUrl}
+                                        alt={tournament.game?.title || "Tournament"}
+                                        className="w-full h-full object-cover"
+                                    />
+                                ) : (
+                                    <div className="w-full h-full bg-gradient-to-br from-purple-200 to-indigo-200" />
+                                )}
+                                {/* Gradient overlays */}
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                                <div className="absolute inset-0 bg-gradient-to-r from-black/30 to-transparent" />
 
-                        {/* Banner content */}
-                        <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
-                            <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-4">
-                                <div>
-                                    {/* Status badge */}
-                                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border mb-3 ${
-                                        tournament.status === "active"
-                                            ? "bg-emerald-500/90 text-white border-emerald-400/50"
-                                            : tournament.status === "upcoming"
-                                                ? "bg-blue-500/90 text-white border-blue-400/50"
-                                                : "bg-slate-600/80 text-white border-slate-500/50"
-                                    }`}>
-                                        {tournament.status === "active" && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
-                                        {tournament.status === "active" ? "Live Now" : tournament.status === "upcoming" ? "Upcoming" : "Ended"}
-                                    </span>
-
-                                    <h1 className="text-2xl md:text-4xl font-black text-white leading-tight mb-1.5 drop-shadow-lg">
-                                        {tournament.title}
-                                    </h1>
-                                    <div className="flex items-center gap-3 text-white/70 text-xs font-medium">
-                                        <span className="flex items-center gap-1">
-                                            <Gamepad2 className="w-3.5 h-3.5" />
-                                            {tournament.game?.title || "Unknown Game"}
-                                        </span>
-                                        {tournament.status === "active" && tournament.end_at && (
-                                            <span className="flex items-center gap-1 text-amber-200">
-                                                <Timer className="w-3.5 h-3.5" />
-                                                {getTimeRemaining(tournament.end_at)}
+                                {/* Banner content */}
+                                <div className="absolute bottom-0 left-0 right-0 p-6 md:p-8">
+                                    <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-end justify-between gap-4">
+                                        <div>
+                                            {/* Status badge */}
+                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-md border mb-3 ${
+                                                actualStatus === "active"
+                                                    ? "bg-emerald-500/90 text-white border-emerald-400/50"
+                                                    : actualStatus === "upcoming"
+                                                        ? "bg-blue-500/90 text-white border-blue-400/50"
+                                                        : "bg-slate-600/80 text-white border-slate-500/50"
+                                            }`}>
+                                                {actualStatus === "active" && <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                                                {actualStatus === "active" ? "Live Now" : actualStatus === "upcoming" ? "Upcoming" : "Ended"}
                                             </span>
+
+                                            <h1 className="text-2xl md:text-4xl font-black text-white leading-tight mb-1.5 drop-shadow-lg">
+                                                {tournament.title}
+                                            </h1>
+                                            <div className="flex items-center gap-3 text-white/70 text-xs font-medium">
+                                                <span className="flex items-center gap-1">
+                                                    <Gamepad2 className="w-3.5 h-3.5" />
+                                                    {tournament.game?.title || "Unknown Game"}
+                                                </span>
+                                                {actualStatus === "active" && tournament.end_at && (
+                                                    <span className="flex items-center gap-1 text-amber-200">
+                                                        <Timer className="w-3.5 h-3.5" />
+                                                        {getTimeRemaining(tournament.end_at)}
+                                                    </span>
+                                                )}
+                                                {actualStatus === "upcoming" && tournament.start_at && (
+                                                    <span className="flex items-center gap-1 text-sky-200">
+                                                        <Clock className="w-3.5 h-3.5 animate-pulse" />
+                                                        {getCountdown(tournament.start_at)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Play button */}
+                                        {actualStatus === "active" && tournament.game?.game_url && (
+                                            <button
+                                                onClick={handlePlayTournament}
+                                                className="px-7 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm uppercase tracking-wider rounded-2xl shadow-xl shadow-purple-600/25 hover:shadow-purple-500/35 flex items-center gap-2.5 active:scale-95 transition-all cursor-pointer group"
+                                            >
+                                                <Play className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" />
+                                                Play Tournament
+                                            </button>
                                         )}
                                     </div>
                                 </div>
-
-                                {/* Play button */}
-                                {tournament.status === "active" && tournament.game?.game_url && (
-                                    <button
-                                        onClick={handlePlayTournament}
-                                        className="px-7 py-3.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm uppercase tracking-wider rounded-2xl shadow-xl shadow-purple-600/25 hover:shadow-purple-500/35 flex items-center gap-2.5 active:scale-95 transition-all cursor-pointer group"
-                                    >
-                                        <Play className="w-4 h-4 fill-current group-hover:scale-110 transition-transform" />
-                                        Play Tournament
-                                    </button>
-                                )}
                             </div>
-                        </div>
-                    </div>
+                        );
+                    })()}
 
                     {/* Content area */}
                     <div className="max-w-6xl mx-auto px-6 md:px-8 py-8">
@@ -315,7 +361,7 @@ export default function TournamentDetailPage() {
                                             <span className="text-[9px] font-bold uppercase tracking-wider">Start</span>
                                         </div>
                                         <p className="text-xs font-bold text-slate-700">
-                                            {tournament.start_at ? new Date(tournament.start_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "TBD"}
+                                            {tournament.start_at ? formatDateTime(tournament.start_at) : "TBD"}
                                         </p>
                                     </div>
                                     <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-100">
@@ -324,7 +370,7 @@ export default function TournamentDetailPage() {
                                             <span className="text-[9px] font-bold uppercase tracking-wider">End</span>
                                         </div>
                                         <p className="text-xs font-bold text-slate-700">
-                                            {tournament.end_at ? new Date(tournament.end_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "Manual"}
+                                            {tournament.end_at ? formatDateTime(tournament.end_at) : "Manual"}
                                         </p>
                                     </div>
                                     <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-100">
@@ -384,7 +430,7 @@ export default function TournamentDetailPage() {
                                     <div className="flex flex-col items-center justify-center py-6 text-center">
                                         <Activity className="w-8 h-8 text-purple-300 mb-3" />
                                         <p className="text-xs text-slate-400 font-medium">
-                                            {tournament.status === "active"
+                                            {getTournamentActualStatus(tournament.start_at, tournament.end_at) === "active"
                                                 ? "Play to get on the board!"
                                                 : "You didn't participate"}
                                         </p>

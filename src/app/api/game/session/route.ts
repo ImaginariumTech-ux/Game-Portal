@@ -45,9 +45,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: 'Tournament not found' }, { status: 404 });
       }
 
-      // Check current time against tournament status
-      if (tournament.status !== 'active') {
-        return NextResponse.json({ error: 'This tournament is not currently active.' }, { status: 400 });
+      // Check current time against tournament schedule dynamically
+      const now = new Date();
+      const start = new Date(tournament.start_at);
+      const end = new Date(tournament.end_at);
+
+      if (now < start) {
+        return NextResponse.json({ error: 'This tournament has not started yet.' }, { status: 400 });
+      }
+      if (now >= end) {
+        return NextResponse.json({ error: 'This tournament has already ended.' }, { status: 400 });
       }
     }
 

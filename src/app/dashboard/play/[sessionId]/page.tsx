@@ -43,6 +43,9 @@ export default function GamePlayPage() {
     const router = useRouter();
     const sessionId = params.sessionId as string;
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    const isGameOverRef = useRef(false);
+    const restartAckReceivedRef = useRef(false);
+    const hasTriggeredHighScoreAlertRef = useRef(false);
 
     const [userId, setUserId] = useState<string | null>(null);
     const [session, setSession] = useState<GameSession | null>(null);
@@ -57,10 +60,48 @@ export default function GamePlayPage() {
     const [bestScore, setBestScore] = useState<number | null>(null);
     const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
     const [fetchingResults, setFetchingResults] = useState(false);
+    const [showMidGameAlert, setShowMidGameAlert] = useState(false);
+
+    // Listen for direct HTML5 window postMessage notifications from the game iframe
+    useEffect(() => {
+        if (!userId) return;
+
+        const handleMessage = async (event: MessageEvent) => {
+            if (event.data) {
+                if (event.data.type === "MATCH_COMPLETE") {
+                    const score = Number(event.data.score);
+                    if (!isGameOverRef.current) {
+                        await handleMatchFinished(score, userId, session?.tournament_id || null);
+                    }
+                } else if (event.data.type === "RESTART_ACK") {
+                    restartAckReceivedRef.current = true;
+                } else if (event.data.type === "SCORE_UPDATE") {
+                    const currentScore = Number(event.data.score);
+                    if (!isNaN(currentScore) && bestScore !== null && bestScore > 0 && currentScore > bestScore) {
+                        if (!hasTriggeredHighScoreAlertRef.current) {
+                            hasTriggeredHighScoreAlertRef.current = true;
+                            setShowMidGameAlert(true);
+                            setTimeout(() => {
+                                setShowMidGameAlert(false);
+                            }, 3000);
+                        }
+                        setBestScore(currentScore);
+                    }
+                }
+            }
+        };
+
+        window.addEventListener("message", handleMessage);
+        return () => window.removeEventListener("message", handleMessage);
+    }, [userId, session, bestScore]);
 
     useEffect(() => {
+        let cleanupRealtime: (() => void) | null = null;
+        let pollInterval: NodeJS.Timeout | null = null;
+
         const init = async () => {
             try {
+                hasTriggeredHighScoreAlertRef.current = false;
                 // Get auth user
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) {
@@ -98,10 +139,36 @@ export default function GamePlayPage() {
                     if (tourData) setTournament(tourData);
                 }
 
+                // If the session is already completed in the database, show results directly
+                if (sessionData.status === 'completed' && sessionData.score !== null) {
+                    setLoading(false);
+                    await handleMatchFinished(Number(sessionData.score), user.id, sessionData.tournament_id);
+                    return;
+                }
+
                 setLoading(false);
 
-                // Setup realtime listener for session updates on game_sessions
-                setupRealtimeListener(user.id, sessionData.tournament_id);
+                // 1. Setup realtime listener for session updates on game_sessions
+                cleanupRealtime = setupRealtimeListener(user.id, sessionData.tournament_id);
+
+                // 2. Setup polling fallback (runs every 2.5s) to guarantee updates if Realtime is not active on DB
+                pollInterval = setInterval(async () => {
+                    if (isGameOverRef.current) {
+                        if (pollInterval) clearInterval(pollInterval);
+                        return;
+                    }
+
+                    const { data: currentSession } = await supabase
+                        .from("game_sessions")
+                        .select("status, score")
+                        .eq("id", sessionId)
+                        .maybeSingle();
+
+                    if (currentSession && currentSession.status === 'completed' && currentSession.score !== null) {
+                        if (pollInterval) clearInterval(pollInterval);
+                        await handleMatchFinished(Number(currentSession.score), user.id, sessionData.tournament_id);
+                    }
+                }, 2500);
 
             } catch (err: any) {
                 console.error("Error loading play session:", err);
@@ -111,6 +178,11 @@ export default function GamePlayPage() {
         };
 
         init();
+
+        return () => {
+            if (cleanupRealtime) cleanupRealtime();
+            if (pollInterval) clearInterval(pollInterval);
+        };
     }, [sessionId, router]);
 
     const setupRealtimeListener = (currentUserId: string, tournamentId: string | null) => {
@@ -128,7 +200,6 @@ export default function GamePlayPage() {
                     updatedSession.score !== null && 
                     updatedSession.score !== undefined) {
                     
-                    console.log("Match completion detected! Score:", updatedSession.score);
                     await handleMatchFinished(Number(updatedSession.score), currentUserId, tournamentId);
                 }
             })
@@ -140,6 +211,9 @@ export default function GamePlayPage() {
     };
 
     const handleMatchFinished = async (score: number, currentUserId: string, tournamentId: string | null) => {
+        if (isGameOverRef.current) return;
+        isGameOverRef.current = true;
+
         setFinalScore(score);
         setIsGameOver(true);
         setFetchingResults(true);
@@ -173,6 +247,47 @@ export default function GamePlayPage() {
             } catch (err) {
                 console.error("Error fetching end match stats:", err);
             }
+        } else {
+            try {
+                // Fetch the game_id from the database for this session to make the query self-contained
+                const { data: curSession, error: curErr } = await supabase
+                    .from("game_sessions")
+                    .select("game_id")
+                    .eq("id", sessionId)
+                    .single();
+
+                if (curErr) throw curErr;
+                if (!curSession) throw new Error("Active session not found in database");
+
+                // Practice mode stats: query previous completed practice sessions for this user and game
+                const { data: prevSessions, error: sErr } = await supabase
+                    .from("game_sessions")
+                    .select("score")
+                    .eq("game_id", curSession.game_id)
+                    .eq("user_id", currentUserId)
+                    .eq("mode", "practice")
+                    .eq("status", "completed")
+                    .neq("id", sessionId);
+
+                if (sErr) throw sErr;
+
+                const scores = prevSessions ? prevSessions.map(s => Number(s.score || 0)) : [];
+                const maxPrevScore = scores.length > 0 ? Math.max(...scores) : 0;
+
+                setBestScore(Math.max(maxPrevScore, score));
+                
+                if (scores.length > 0) {
+                    if (score > maxPrevScore) {
+                        setIsHighScore(true);
+                    }
+                } else {
+                    if (score > 0) {
+                        setIsHighScore(true);
+                    }
+                }
+            } catch (err) {
+                console.error("Error fetching practice stats:", err);
+            }
         }
         setFetchingResults(false);
     };
@@ -182,13 +297,14 @@ export default function GamePlayPage() {
         
         try {
             setLoading(true);
+            isGameOverRef.current = false;
             setIsGameOver(false);
             setFinalScore(null);
             setIsHighScore(false);
             setBestScore(null);
             setLeaderboardRank(null);
 
-            // Call session generation API
+            // 1. Fetch new session from backend
             const response = await fetch("/api/game/session", {
                 method: "POST",
                 headers: {
@@ -206,8 +322,35 @@ export default function GamePlayPage() {
                 throw new Error(resData.error || "Failed to start new session");
             }
 
-            // Navigate to new play page
-            router.replace(`/dashboard/play/${resData.sessionId}`);
+            const newSessionId = resData.sessionId;
+            const newPath = `/dashboard/play/${newSessionId}`;
+
+            // Reset ACK ref before sending message
+            restartAckReceivedRef.current = false;
+            hasTriggeredHighScoreAlertRef.current = false;
+
+            // 2. Try the fast restart path: send postMessage to iframe
+            if (iframeRef.current && iframeRef.current.contentWindow) {
+                iframeRef.current.contentWindow.postMessage({
+                    type: "RESTART_GAME",
+                    sessionId: newSessionId
+                }, "*");
+            }
+
+            // 3. Start a 500ms fallback timeout
+            setTimeout(async () => {
+                if (restartAckReceivedRef.current) {
+                    // Success! Game supports fast restart.
+                    // Update React state and silently replace URL in address bar without reloading iframe
+                    setSession(prev => prev ? { ...prev, id: newSessionId, status: 'in_progress', score: null } : null);
+                    window.history.replaceState(null, '', newPath);
+                    setLoading(false);
+                } else {
+                    // Fallback: Game does not support fast restart. Reload iframe.
+                    router.replace(newPath);
+                }
+            }, 500);
+
         } catch (err: any) {
             console.error("Error restarting match:", err);
             toast.error(err.message || "Failed to start new match");
@@ -282,113 +425,110 @@ export default function GamePlayPage() {
                 allow="autoplay; fullscreen"
             />
 
+            {/* Mid-Game High Score Alert Pop-Up */}
+            {showMidGameAlert && (
+                <div className="absolute inset-0 pointer-events-none z-[999] flex items-center justify-center animate-in zoom-in-75 fade-in duration-500">
+                    <div className="flex flex-col items-center animate-bounce">
+                        <img
+                            src="/ChatGPT Image Jul 8, 2026, 11_57_12 AM.png"
+                            alt="NEW RECORD!"
+                            className="w-44 sm:w-52 object-contain drop-shadow-[0_10px_25px_rgba(168,85,247,0.6)]"
+                        />
+                        <div className="bg-purple-600/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-purple-400 text-white text-[10px] font-black uppercase tracking-widest shadow-lg -mt-3 shadow-purple-500/20">
+                            New High Score!
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Game Over Results Overlay */}
             {isGameOver && (
-                <div className="absolute inset-0 z-[1000] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
-                    <div className="relative w-full max-w-md bg-white border border-slate-200/80 rounded-[40px] shadow-2xl shadow-slate-400/50 p-8 text-center flex flex-col items-center overflow-hidden">
-                        {/* Decorative Gradient Glow */}
-                        <div className="absolute -top-20 -left-20 w-48 h-48 bg-purple-200/40 rounded-full blur-3xl pointer-events-none" />
-                        <div className="absolute -bottom-20 -right-20 w-48 h-48 bg-pink-200/40 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute inset-0 z-[1000] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    {fetchingResults ? (
+                        <div className="flex flex-col items-center gap-4 text-center text-white">
+                            <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
+                            <p className="text-xs text-purple-300 uppercase font-black tracking-widest">Saving results...</p>
+                        </div>
+                    ) : (
+                        /* Portrait Card Container with Background Image */
+                        <div 
+                            className="relative w-full max-w-[350px] h-[90vh] max-h-[640px] rounded-[40px] shadow-2xl border border-white/10 flex flex-col justify-end p-6 overflow-hidden bg-cover bg-center bg-no-repeat"
+                            style={{ backgroundImage: "url('/Logo_text__CAUGHT!__collision_2K_202607081133.jpeg')" }}
+                        >
+                            {/* Dark Gradient Overlay at the bottom to ensure readability of card and buttons */}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-                        {fetchingResults ? (
-                            <div className="py-20 flex flex-col items-center gap-3">
-                                <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
-                                <p className="text-xs text-slate-400 uppercase font-black tracking-widest">Saving results...</p>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Icon Header */}
-                                {tournament ? (
-                                    isHighScore ? (
-                                        <div className="w-20 h-20 rounded-[30px] bg-yellow-50 flex items-center justify-center border border-yellow-200/60 mb-6 animate-bounce">
-                                            <Sparkles className="w-10 h-10 text-yellow-500 fill-current" />
-                                        </div>
-                                    ) : (
-                                        <div className="w-20 h-20 rounded-[30px] bg-purple-50 flex items-center justify-center border border-purple-200/60 mb-6">
-                                            <Trophy className="w-10 h-10 text-purple-500" />
-                                        </div>
-                                    )
-                                ) : (
-                                    <div className="w-20 h-20 rounded-[30px] bg-blue-50 flex items-center justify-center border border-blue-200/60 mb-6">
-                                        <Smile className="w-10 h-10 text-blue-500" />
-                                    </div>
+                            {/* Content Wrapper (stands on top of the background) */}
+                            <div className="relative z-10 w-full flex flex-col items-center">
+                                {/* New High Score Badge */}
+                                {isHighScore && (
+                                    <img
+                                        src="/ChatGPT%20Image%20Jul%208,%202026,%2011_57_12%20AM.png"
+                                        alt="NEW RECORD!"
+                                        className="w-full max-w-[150px] sm:max-w-[185px] object-contain mb-4 animate-bounce duration-1000"
+                                    />
                                 )}
 
-                                {/* Heading */}
-                                <h2 className="text-3xl font-black uppercase italic tracking-tight text-slate-900 mb-2">
-                                    {tournament ? (isHighScore ? "New Record!" : "Match Finished!") : "Practice Complete!"}
-                                </h2>
-                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em] mb-6">
-                                    {tournament ? `Tournament: ${tournament.title}` : `Training run on ${session.game.title}`}
-                                </p>
-
-                                {/* Score Showcase */}
-                                <div className="w-full bg-slate-50 border border-slate-200/80 rounded-3xl p-5 mb-8">
-                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Your Score</p>
-                                    <h3 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600 leading-tight">
-                                        {finalScore?.toLocaleString()} pts
-                                    </h3>
-                                    
-                                    {tournament && (
-                                        <div className="grid grid-cols-2 gap-4 border-t border-slate-200/60 mt-4 pt-4">
-                                            <div>
-                                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Leaderboard Rank</p>
-                                                <p className="text-lg font-black text-slate-900 leading-none">
-                                                    {leaderboardRank ? `#${leaderboardRank}` : "Unranked"}
-                                                </p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Personal Best</p>
-                                                <p className="text-lg font-black text-slate-900 leading-none">
-                                                    {bestScore ? `${bestScore.toLocaleString()} pts` : "-"}
-                                                </p>
-                                            </div>
+                                {/* Score/Stats White Card */}
+                                <div className="w-full bg-white rounded-[26px] shadow-xl p-5 text-center text-slate-800 mb-6">
+                                    <div className="grid grid-cols-3 gap-1 divide-x divide-slate-100">
+                                        {/* Your Score */}
+                                        <div className="flex flex-col items-center justify-between min-h-[44px] px-1">
+                                            <span className="text-[8px] sm:text-[9px] text-slate-400 font-extrabold uppercase tracking-wider leading-tight">
+                                                YOUR<br />SCORE
+                                            </span>
+                                            <span className="text-xl sm:text-2xl font-black text-slate-900 mt-1 leading-none">
+                                                {finalScore ?? 0}
+                                            </span>
                                         </div>
-                                    )}
+
+                                        {/* Leaderboard Rank */}
+                                        <div className="flex flex-col items-center justify-between min-h-[44px] px-1">
+                                            <span className="text-[8px] sm:text-[9px] text-slate-400 font-extrabold uppercase tracking-wider leading-tight">
+                                                LEADERBOARD<br />RANK
+                                            </span>
+                                            <span className="text-xl sm:text-2xl font-black text-[#b81d6c] mt-1 leading-none">
+                                                {tournament ? (leaderboardRank ? leaderboardRank : "-") : "N/A"}
+                                            </span>
+                                        </div>
+
+                                        {/* Personal Best */}
+                                        <div className="flex flex-col items-center justify-between min-h-[44px] px-1">
+                                            <span className="text-[8px] sm:text-[9px] text-slate-400 font-extrabold uppercase tracking-wider leading-tight">
+                                                PERSONAL<br />BEST
+                                            </span>
+                                            <span className="text-xl sm:text-2xl font-black text-slate-900 mt-1 leading-none">
+                                                {bestScore ?? finalScore ?? 0}
+                                            </span>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* Encouragement text */}
-                                {tournament && !isHighScore && (
-                                    <p className="text-xs text-slate-500 font-medium leading-relaxed mb-8 px-4">
-                                        You didn't beat your personal best of {bestScore?.toLocaleString()} pts, but keep training!
-                                    </p>
-                                )}
-
-                                {/* Buttons */}
-                                <div className="w-full space-y-3">
+                                {/* Bottom Pill Buttons */}
+                                <div className="flex flex-col gap-3 w-full">
                                     <button
                                         onClick={handlePlayAgain}
-                                        className="w-full py-4 bg-purple-600 text-white font-black text-xs uppercase tracking-[0.15em] rounded-2xl hover:bg-purple-700 transition-all flex items-center justify-center gap-2 active:scale-[0.98] shadow-md shadow-purple-200"
+                                        className="w-full py-4 bg-gradient-to-r from-[#941db4] to-[#d61e80] hover:from-[#aa26cf] hover:to-[#eb2791] text-white font-black text-xs tracking-widest uppercase rounded-full flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md shadow-purple-950/40 cursor-pointer"
                                     >
-                                        <RotateCcw className="w-4 h-4" /> Play Again
+                                        PLAY AGAIN <RotateCcw className="w-4 h-4 stroke-[3]" />
                                     </button>
-
-                                    {tournament ? (
-                                        <button
-                                            onClick={() => router.push("/dashboard/leaderboard")}
-                                            className="w-full py-4 bg-purple-50 text-purple-750 border border-purple-200/80 font-black text-xs uppercase tracking-[0.15em] rounded-2xl hover:bg-purple-100 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
-                                        >
-                                            <Trophy className="w-4 h-4" /> View Leaderboard
-                                        </button>
-                                    ) : (
-                                        <button
-                                            onClick={() => router.push(`/dashboard/games/${session.game_id}`)}
-                                            className="w-full py-4 bg-slate-50 border border-slate-200 text-slate-600 hover:text-slate-900 font-black text-xs uppercase tracking-[0.15em] rounded-2xl hover:bg-slate-100 transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
-                                        >
-                                            <Gamepad2 className="w-4 h-4" /> Game Details
-                                        </button>
-                                    )}
 
                                     <button
-                                        onClick={() => router.push("/dashboard")}
-                                        className="w-full py-3 text-xs text-slate-500 hover:text-slate-800 font-bold uppercase tracking-widest transition-all"
+                                        onClick={() => {
+                                            if (session.tournament_id) {
+                                                router.push(`/dashboard/leaderboard/${session.tournament_id}`);
+                                            } else {
+                                                router.push("/dashboard");
+                                            }
+                                        }}
+                                        className="w-full py-4 bg-transparent border-2 border-white/40 hover:border-white hover:bg-white/5 text-white font-black text-xs tracking-widest uppercase rounded-full transition-all active:scale-[0.98] cursor-pointer text-center"
                                     >
-                                        Back to Dashboard
+                                        BACK TO PORTAL
                                     </button>
                                 </div>
-                            </>
-                        )}
-                    </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

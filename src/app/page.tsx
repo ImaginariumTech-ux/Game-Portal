@@ -133,7 +133,7 @@ export default function UserAuth() {
           {/* Header */}
           <div className="text-center mb-4">
             <div className="mx-auto w-10 h-10 relative mb-2 rounded-xl overflow-hidden">
-              <Image src="/magic-logo-white.png" alt="Magic Games Logo" fill className="object-contain" priority />
+              <Image src="/magic-logo-white.png" alt="Magic Games Logo" fill sizes="40px" className="object-contain" priority />
             </div>
             <h1 className="text-xl font-bold text-white tracking-tight leading-tight">Magic Games</h1>
             <p className="text-purple-200/60 text-[9px] tracking-widest uppercase font-medium mt-0.5">

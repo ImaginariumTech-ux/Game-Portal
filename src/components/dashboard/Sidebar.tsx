@@ -113,7 +113,7 @@ export default function Sidebar({ onNavItemClick, currentActiveId, isOpen, onClo
                 <div className="p-4 border-b border-slate-200/80 flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 relative rounded-lg overflow-hidden bg-purple-100 border border-purple-200">
-                            <Image src="/magic-logo-white.png" alt="Logo" fill className="object-contain p-1 filter invert brightness-0" />
+                            <Image src="/magic-logo-white.png" alt="Logo" fill sizes="32px" className="object-contain p-1 filter invert brightness-0" />
                         </div>
                         <span className="font-black text-sm bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
                             Magic Games
