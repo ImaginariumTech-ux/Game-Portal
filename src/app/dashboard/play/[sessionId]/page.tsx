@@ -67,16 +67,25 @@ export default function GamePlayPage() {
         if (!userId) return;
 
         const handleMessage = async (event: MessageEvent) => {
-            if (event.data) {
-                if (event.data.type === "MATCH_COMPLETE") {
-                    const score = Number(event.data.score);
+            let data = event.data;
+            if (typeof data === "string") {
+                try {
+                    data = JSON.parse(data);
+                } catch {
+                    // Ignore non-JSON strings
+                }
+            }
+
+            if (data) {
+                if (data.type === "MATCH_COMPLETE") {
+                    const score = Number(data.score);
                     if (!isGameOverRef.current) {
                         await handleMatchFinished(score, userId, session?.tournament_id || null);
                     }
-                } else if (event.data.type === "RESTART_ACK") {
+                } else if (data.type === "RESTART_ACK") {
                     restartAckReceivedRef.current = true;
-                } else if (event.data.type === "SCORE_UPDATE") {
-                    const currentScore = Number(event.data.score);
+                } else if (data.type === "SCORE_UPDATE") {
+                    const currentScore = Number(data.score);
                     if (!isNaN(currentScore) && bestScore !== null && bestScore > 0 && currentScore > bestScore) {
                         if (!hasTriggeredHighScoreAlertRef.current) {
                             hasTriggeredHighScoreAlertRef.current = true;
