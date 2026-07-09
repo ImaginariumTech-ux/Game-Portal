@@ -342,12 +342,17 @@ export default function GamePlayPage() {
             hasTriggeredHighScoreAlertRef.current = false;
 
             // 2. Try the fast restart path: send postMessage to iframe
-            if (iframeRef.current && iframeRef.current.contentWindow) {
+            const iframeEl = document.getElementById("game-iframe") as HTMLIFrameElement;
+            const targetWindow = iframeEl?.contentWindow || iframeRef.current?.contentWindow;
+
+            if (targetWindow) {
                 console.log("Portal posting RESTART_GAME signal to game iframe. sessionId:", newSessionId);
-                iframeRef.current.contentWindow.postMessage({
+                targetWindow.postMessage({
                     type: "RESTART_GAME",
                     sessionId: newSessionId
                 }, "*");
+            } else {
+                console.error("Portal Error: Game iframe window not found via ref or document ID!");
             }
 
             // 3. Start a 500ms fallback timeout
