@@ -436,6 +436,7 @@ export default function GamePlayPage() {
             {/* Game Iframe */}
             <iframe
                 ref={iframeRef}
+                id="game-iframe"
                 src={finalUrl}
                 className="w-full h-full border-none"
                 allow="autoplay; fullscreen"
