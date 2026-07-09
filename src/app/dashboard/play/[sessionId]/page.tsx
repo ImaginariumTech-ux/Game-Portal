@@ -77,6 +77,9 @@ export default function GamePlayPage() {
             }
 
             if (data) {
+                if (data.type) {
+                    console.log("Portal message received from iframe. Event type:", data.type, "payload:", data);
+                }
                 if (data.type === "MATCH_COMPLETE") {
                     const score = Number(data.score);
                     if (!isGameOverRef.current) {
@@ -340,6 +343,7 @@ export default function GamePlayPage() {
 
             // 2. Try the fast restart path: send postMessage to iframe
             if (iframeRef.current && iframeRef.current.contentWindow) {
+                console.log("Portal posting RESTART_GAME signal to game iframe. sessionId:", newSessionId);
                 iframeRef.current.contentWindow.postMessage({
                     type: "RESTART_GAME",
                     sessionId: newSessionId
@@ -348,13 +352,16 @@ export default function GamePlayPage() {
 
             // 3. Start a 500ms fallback timeout
             setTimeout(async () => {
+                console.log("Portal 500ms timeout check. restartAckReceived =", restartAckReceivedRef.current);
                 if (restartAckReceivedRef.current) {
+                    console.log("Portal fast restart flow successful! Replacing URL bar silently.");
                     // Success! Game supports fast restart.
                     // Update React state and silently replace URL in address bar without reloading iframe
                     setSession(prev => prev ? { ...prev, id: newSessionId, status: 'in_progress', score: null } : null);
                     window.history.replaceState(null, '', newPath);
                     setLoading(false);
                 } else {
+                    console.warn("Portal fast restart timed out. Doing fallback full reload of the game iframe...");
                     // Fallback: Game does not support fast restart. Reload iframe.
                     router.replace(newPath);
                 }
