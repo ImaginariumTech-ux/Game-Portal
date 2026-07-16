@@ -86,6 +86,24 @@ export default function GamePlayPage() {
                     if (!isGameOverRef.current) {
                         await handleMatchFinished(score, userId, session?.tournament_id || null);
                     }
+                } else if (data.type === "REQUEST_RESTART") {
+                    console.log("Portal received REQUEST_RESTART message from game iframe.");
+                    await handlePlayAgain();
+                } else if (data.type === "SESSION_UPDATED") {
+                    const newSessionId = data.sessionId;
+                    if (newSessionId) {
+                        console.log("Portal received SESSION_UPDATED message from game iframe. New sessionId:", newSessionId);
+                        const newPath = `/dashboard/play/${newSessionId}`;
+                        setSession(prev => prev ? { ...prev, id: newSessionId, status: 'in_progress', score: null } : null);
+                        window.history.replaceState(null, '', newPath);
+                        isGameOverRef.current = false;
+                        setIsGameOver(false);
+                        setFinalScore(null);
+                        setIsHighScore(false);
+                        setBestScore(null);
+                        setLeaderboardRank(null);
+                        hasTriggeredHighScoreAlertRef.current = false;
+                    }
                 } else if (data.type === "RESTART_ACK") {
                     restartAckReceivedRef.current = true;
                 } else if (data.type === "SCORE_UPDATE") {
@@ -466,7 +484,8 @@ export default function GamePlayPage() {
                 </div>
             )}
 
-            {/* Game Over Results Overlay */}
+            {/* Game Over Results Overlay (Commented out to allow the WebGL game to handle the results/restart flow) */}
+            {/*
             {isGameOver && (
                 <div className="absolute inset-0 z-[1000] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-300">
                     {fetchingResults ? (
@@ -475,17 +494,13 @@ export default function GamePlayPage() {
                             <p className="text-xs text-purple-300 uppercase font-black tracking-widest">Saving results...</p>
                         </div>
                     ) : (
-                        /* Portrait Card Container with Background Image */
                         <div 
                             className="relative w-full max-w-[350px] h-[90vh] max-h-[640px] rounded-[40px] shadow-2xl border border-white/10 flex flex-col justify-end p-6 overflow-hidden bg-cover bg-center bg-no-repeat"
                             style={{ backgroundImage: "url('/Logo_text__CAUGHT!__collision_2K_202607081133.jpeg')" }}
                         >
-                            {/* Dark Gradient Overlay at the bottom to ensure readability of card and buttons */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none" />
 
-                            {/* Content Wrapper (stands on top of the background) */}
                             <div className="relative z-10 w-full flex flex-col items-center">
-                                {/* New High Score Badge */}
                                 {isHighScore && (
                                     <img
                                         src="/ChatGPT%20Image%20Jul%208,%202026,%2011_57_12%20AM.png"
@@ -494,10 +509,8 @@ export default function GamePlayPage() {
                                     />
                                 )}
 
-                                {/* Score/Stats White Card */}
                                 <div className="w-full bg-white rounded-[26px] shadow-xl p-5 text-center text-slate-800 mb-6">
                                     <div className="grid grid-cols-3 gap-1 divide-x divide-slate-100">
-                                        {/* Your Score */}
                                         <div className="flex flex-col items-center justify-between min-h-[44px] px-1">
                                             <span className="text-[8px] sm:text-[9px] text-slate-400 font-extrabold uppercase tracking-wider leading-tight">
                                                 YOUR<br />SCORE
@@ -507,7 +520,6 @@ export default function GamePlayPage() {
                                             </span>
                                         </div>
 
-                                        {/* Leaderboard Rank */}
                                         <div className="flex flex-col items-center justify-between min-h-[44px] px-1">
                                             <span className="text-[8px] sm:text-[9px] text-slate-400 font-extrabold uppercase tracking-wider leading-tight">
                                                 LEADERBOARD<br />RANK
@@ -517,7 +529,6 @@ export default function GamePlayPage() {
                                             </span>
                                         </div>
 
-                                        {/* Personal Best */}
                                         <div className="flex flex-col items-center justify-between min-h-[44px] px-1">
                                             <span className="text-[8px] sm:text-[9px] text-slate-400 font-extrabold uppercase tracking-wider leading-tight">
                                                 PERSONAL<br />BEST
@@ -529,7 +540,6 @@ export default function GamePlayPage() {
                                     </div>
                                 </div>
 
-                                {/* Bottom Pill Buttons */}
                                 <div className="flex flex-col gap-3 w-full">
                                     <button
                                         onClick={handlePlayAgain}
@@ -565,6 +575,7 @@ export default function GamePlayPage() {
                     )}
                 </div>
             )}
+            */}
         </div>
     );
 }
