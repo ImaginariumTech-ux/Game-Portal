@@ -63,6 +63,22 @@ export default function GamePlayPage() {
     const [showMidGameAlert, setShowMidGameAlert] = useState(false);
     const [restarting, setRestarting] = useState(false);
 
+    // Reset all gameplay tracking states and refs when sessionId changes to support component reuse
+    useEffect(() => {
+        isGameOverRef.current = false;
+        restartAckReceivedRef.current = false;
+        hasTriggeredHighScoreAlertRef.current = false;
+        
+        setIsGameOver(false);
+        setFinalScore(null);
+        setIsHighScore(false);
+        setBestScore(null);
+        setLeaderboardRank(null);
+        setFetchingResults(false);
+        setShowMidGameAlert(false);
+        setRestarting(false);
+    }, [sessionId]);
+
     // Listen for direct HTML5 window postMessage notifications from the game iframe
     useEffect(() => {
         if (!userId) return;
