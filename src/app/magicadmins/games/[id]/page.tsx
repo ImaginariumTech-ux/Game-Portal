@@ -24,6 +24,7 @@ export default function ManageGamePage() {
     const [slug, setSlug] = useState("");
     const [webhookSecret, setWebhookSecret] = useState("");
     const [copied, setCopied] = useState(false);
+    const [copiedId, setCopiedId] = useState(false);
     const [description, setDescription] = useState("");
     const [version, setVersion] = useState("");
     const [gameUrl, setGameUrl] = useState("");
@@ -920,6 +921,25 @@ export default function ManageGamePage() {
                                                 <a href={gameUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm break-all hover:underline block truncate" title={gameUrl}>
                                                     {gameUrl}
                                                 </a>
+                                            </div>
+
+                                            <div>
+                                                <div className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1">Game ID (UUID)</div>
+                                                <div className="flex items-center gap-2 mt-1.5">
+                                                    <code className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-gray-300 select-all break-all block">
+                                                        {id}
+                                                    </code>
+                                                    <button
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(id);
+                                                            setCopiedId(true);
+                                                            setTimeout(() => setCopiedId(false), 2000);
+                                                        }}
+                                                        className="px-3 py-2 bg-purple-600 hover:bg-purple-500 active:scale-95 transition-all text-white font-bold rounded-lg text-xs shrink-0 cursor-pointer"
+                                                    >
+                                                        {copiedId ? "Copied!" : "Copy"}
+                                                    </button>
+                                                </div>
                                             </div>
 
                                             <hr className="border-white/10" />

@@ -61,6 +61,7 @@ export default function GamePlayPage() {
     const [leaderboardRank, setLeaderboardRank] = useState<number | null>(null);
     const [fetchingResults, setFetchingResults] = useState(false);
     const [showMidGameAlert, setShowMidGameAlert] = useState(false);
+    const [restarting, setRestarting] = useState(false);
 
     // Listen for direct HTML5 window postMessage notifications from the game iframe
     useEffect(() => {
@@ -308,9 +309,8 @@ export default function GamePlayPage() {
         if (!session || !session.game || !userId) return;
         
         try {
-            setLoading(true);
+            setRestarting(true);
             isGameOverRef.current = false;
-            setIsGameOver(false);
             setFinalScore(null);
             setIsHighScore(false);
             setBestScore(null);
@@ -341,6 +341,10 @@ export default function GamePlayPage() {
             restartAckReceivedRef.current = false;
             hasTriggeredHighScoreAlertRef.current = false;
 
+            // Hide overlay and allow iframe interaction
+            setIsGameOver(false);
+            setRestarting(false);
+
             // 2. Try the fast restart path: send postMessage to iframe
             const iframeEl = document.getElementById("game-iframe") as HTMLIFrameElement;
             const targetWindow = iframeEl?.contentWindow || iframeRef.current?.contentWindow;
@@ -364,18 +368,17 @@ export default function GamePlayPage() {
                     // Update React state and silently replace URL in address bar without reloading iframe
                     setSession(prev => prev ? { ...prev, id: newSessionId, status: 'in_progress', score: null } : null);
                     window.history.replaceState(null, '', newPath);
-                    setLoading(false);
                 } else {
-                    console.warn("Portal fast restart timed out. Doing fallback full reload of the game iframe...");
+                    console.warn("Portal fast restart timed out. Doing fallback full reload of the game iframe... (TEMPORARILY DISABLED FOR TESTING)");
                     // Fallback: Game does not support fast restart. Reload iframe.
-                    router.replace(newPath);
+                    // router.replace(newPath);
                 }
             }, 500);
 
         } catch (err: any) {
             console.error("Error restarting match:", err);
             toast.error(err.message || "Failed to start new match");
-            setLoading(false);
+            setRestarting(false);
         }
     };
 
@@ -530,9 +533,18 @@ export default function GamePlayPage() {
                                 <div className="flex flex-col gap-3 w-full">
                                     <button
                                         onClick={handlePlayAgain}
-                                        className="w-full py-4 bg-gradient-to-r from-[#941db4] to-[#d61e80] hover:from-[#aa26cf] hover:to-[#eb2791] text-white font-black text-xs tracking-widest uppercase rounded-full flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md shadow-purple-950/40 cursor-pointer"
+                                        disabled={restarting}
+                                        className="w-full py-4 bg-gradient-to-r from-[#941db4] to-[#d61e80] hover:from-[#aa26cf] hover:to-[#eb2791] text-white font-black text-xs tracking-widest uppercase rounded-full flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-md shadow-purple-950/40 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
-                                        PLAY AGAIN <RotateCcw className="w-4 h-4 stroke-[3]" />
+                                        {restarting ? (
+                                            <>
+                                                RESTARTING... <Loader2 className="w-4.5 h-4.5 animate-spin" />
+                                            </>
+                                        ) : (
+                                            <>
+                                                PLAY AGAIN <RotateCcw className="w-4 h-4 stroke-[3]" />
+                                            </>
+                                        )}
                                     </button>
 
                                     <button
