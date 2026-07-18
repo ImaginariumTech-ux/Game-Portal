@@ -2,11 +2,12 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Save, Trash2, Gamepad2, Upload, Calendar, Clock, Loader2, AlertCircle, CheckCircle, Play, Edit, X, Star, Users2, Plus } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Gamepad2, Upload, Calendar, Clock, Loader2, AlertCircle, CheckCircle, Play, Edit, X, Star, Users2, Plus, FileText, ChevronDown, ChevronUp, FileDown, Activity } from "lucide-react";
 import AdminSidebar from "@/components/AdminSidebar";
 import { supabase } from "@/lib/supabase/client";
 import Image from "next/image";
 import ActionModal from "@/components/ActionModal";
+import toast from "react-hot-toast";
 
 export default function ManageGamePage() {
     const params = useParams();
@@ -53,13 +54,22 @@ export default function ManageGamePage() {
     const [ratingCount, setRatingCount] = useState<number>(0);
     const [ratingBreakdown, setRatingBreakdown] = useState<number[]>([0, 0, 0, 0, 0]); // index 0 = 1 star
 
-    const [activeTab, setActiveTab] = useState<'analytics' | 'characters'>('analytics');
+    const [activeTab, setActiveTab] = useState<'analytics' | 'characters' | 'logs'>('analytics');
     const [characters, setCharacters] = useState<any[]>([]);
     const [loadingCharacters, setLoadingCharacters] = useState(false);
     const [characterName, setCharacterName] = useState("");
     const [characterFile, setCharacterFile] = useState<File | null>(null);
     const [characterPreview, setCharacterPreview] = useState<string | null>(null);
     const [isAddingCharacter, setIsAddingCharacter] = useState(false);
+
+    // Tracking states
+    const [integrationStatus, setIntegrationStatus] = useState<string>('pending');
+    const [lastEventReceivedAt, setLastEventReceivedAt] = useState<string | null>(null);
+    const [totalSessionsCompleted, setTotalSessionsCompleted] = useState<number>(0);
+    const [logs, setLogs] = useState<any[]>([]);
+    const [loadingLogs, setLoadingLogs] = useState(false);
+    const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+    const [updatingStatus, setUpdatingStatus] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const charFileInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +79,73 @@ export default function ManageGamePage() {
         fetchCollections();
         fetchCharacters();
     }, [id]);
+
+    useEffect(() => {
+        if (activeTab === 'logs') {
+            fetchIntegrationLogs();
+        }
+    }, [activeTab, id]);
+
+    const fetchIntegrationLogs = async () => {
+        setLoadingLogs(true);
+        try {
+            const { data, error } = await supabase
+                .from('integration_logs')
+                .select('*')
+                .eq('game_id', id)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            setLogs(data || []);
+        } catch (err: any) {
+            console.error('Error fetching logs:', err);
+        } finally {
+            setLoadingLogs(false);
+        }
+    };
+
+    const handleStatusChange = async (newStatus: string) => {
+        setUpdatingStatus(true);
+        try {
+            const { error } = await supabase
+                .from('games')
+                .update({ integration_status: newStatus })
+                .eq('id', id);
+            if (error) throw error;
+            setIntegrationStatus(newStatus);
+            toast.success(`Status updated to ${newStatus}`);
+        } catch (err: any) {
+            console.error('Error updating status:', err);
+            toast.error(`Failed to update status: ${err.message}`);
+        } finally {
+            setUpdatingStatus(false);
+        }
+    };
+
+    const getRelativeTimeString = (dateStr: string | null) => {
+        if (!dateStr) return { text: "No handshakes received yet", colorClass: "text-gray-500" };
+        const now = new Date();
+        const eventDate = new Date(dateStr);
+        const diffMs = now.getTime() - eventDate.getTime();
+        
+        // Threshold check (48 hours = 172800000 ms)
+        const isQuiet = diffMs > 172800000;
+        
+        const seconds = Math.floor(diffMs / 1000);
+        const minutes = Math.floor(seconds / 60);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        let relativeText = "";
+        if (days > 0) relativeText = `${days} day${days > 1 ? "s" : ""} ago`;
+        else if (hours > 0) relativeText = `${hours} hour${hours > 1 ? "s" : ""} ago`;
+        else if (minutes > 0) relativeText = `${minutes} min${minutes > 1 ? "s" : ""} ago`;
+        else relativeText = "just now";
+
+        return {
+            text: relativeText,
+            colorClass: isQuiet ? "text-red-400 font-bold animate-pulse" : "text-emerald-400"
+        };
+    };
 
     const fetchCharacters = async () => {
         setLoadingCharacters(true);
@@ -107,6 +184,9 @@ export default function ManageGamePage() {
             setThumbnailUrl(game.thumbnail_url || null);
             setThumbnailPreview(game.thumbnail_url || null);
             setFeatured(game.featured || false);
+            setIntegrationStatus(game.integration_status || 'pending');
+            setLastEventReceivedAt(game.last_event_received_at || null);
+            setTotalSessionsCompleted(game.total_sessions_completed || 0);
 
             // Fetch ratings
             const { data: ratingsData } = await supabase
@@ -719,12 +799,19 @@ export default function ManageGamePage() {
                                     </span>
                                     {activeTab === 'characters' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />}
                                 </button>
+                                <button
+                                    onClick={() => setActiveTab('logs')}
+                                    className={`pb-4 text-sm font-bold transition-all relative ${activeTab === 'logs' ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                                >
+                                    Integration Logs
+                                    {activeTab === 'logs' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-purple-500" />}
+                                </button>
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                 {/* Left Content */}
                                 <div className="lg:col-span-2 space-y-8">
-                                    {activeTab === 'analytics' ? (
+                                    {activeTab === 'analytics' && (
                                         <>
                                             <h2 className="text-2xl font-bold flex items-center gap-3">
                                                 Analytics
@@ -783,7 +870,9 @@ export default function ManageGamePage() {
                                                 </div>
                                             </div>
                                         </>
-                                    ) : (
+                                    )}
+
+                                    {activeTab === 'characters' && (
                                         <div className="space-y-6">
                                             <div className="flex items-center justify-between">
                                                 <div>
@@ -888,10 +977,208 @@ export default function ManageGamePage() {
                                             )}
                                         </div>
                                     )}
+
+                                    {activeTab === 'logs' && (
+                                        <div className="space-y-6">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <h2 className="text-2xl font-bold flex items-center gap-3">
+                                                        Integration Logs
+                                                        <span className="text-xs font-normal text-gray-500 bg-white/5 px-2 py-1 rounded-md">Newest First</span>
+                                                    </h2>
+                                                    <p className="text-sm text-gray-500 mt-1">Audit log of all API requests (handshakes) for this game.</p>
+                                                </div>
+                                                <button
+                                                    onClick={fetchIntegrationLogs}
+                                                    disabled={loadingLogs}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-bold border border-white/10 transition-all cursor-pointer"
+                                                >
+                                                    {loadingLogs ? <Loader2 className="w-4 h-4 animate-spin" /> : "Refresh Logs"}
+                                                </button>
+                                            </div>
+
+                                            {loadingLogs ? (
+                                                <div className="flex justify-center py-12">
+                                                    <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                                                </div>
+                                            ) : logs.length === 0 ? (
+                                                <div className="text-center py-16 bg-white/5 border border-dashed border-white/10 rounded-[32px]">
+                                                    <Activity className="w-12 h-12 text-gray-700 mx-auto mb-4" />
+                                                    <p className="text-gray-500 font-medium">No API logs found for this game yet.</p>
+                                                    <p className="text-gray-600 text-xs mt-1">Launch a session or submit a score to record the first event.</p>
+                                                </div>
+                                            ) : (
+                                                <div className="space-y-3">
+                                                    {logs.map((log) => {
+                                                        const isExpanded = expandedLogId === log.id;
+                                                        const isSuccess = log.status_code >= 200 && log.status_code < 300;
+                                                        
+                                                        return (
+                                                            <div 
+                                                                key={log.id} 
+                                                                className={`bg-white/5 border rounded-2xl transition-all duration-200 overflow-hidden ${
+                                                                    isExpanded ? 'border-purple-500/40 bg-purple-500/5' : 'border-white/10 hover:border-white/20'
+                                                                }`}
+                                                            >
+                                                                {/* Header Row */}
+                                                                <div 
+                                                                    onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                                                                    className="flex flex-col sm:flex-row sm:items-center justify-between p-5 gap-3 cursor-pointer select-none"
+                                                                >
+                                                                    <div className="flex items-center gap-3">
+                                                                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-extrabold ${
+                                                                            log.endpoint === 'init' 
+                                                                                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' 
+                                                                                : 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20'
+                                                                        }`}>
+                                                                            {log.endpoint === 'init' ? 'GET /init' : 'POST /complete'}
+                                                                        </span>
+                                                                        
+                                                                        <span className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold ${
+                                                                            isSuccess 
+                                                                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' 
+                                                                                : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                                                                        }`}>
+                                                                            {log.status_code}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    <div className="flex items-center justify-between sm:justify-end gap-6 flex-1">
+                                                                        {log.endpoint === 'match_complete' ? (
+                                                                            <span className={`text-xs ${
+                                                                                log.signature_valid 
+                                                                                    ? 'text-emerald-400 flex items-center gap-1 font-semibold' 
+                                                                                    : 'text-red-400 flex items-center gap-1 font-semibold'
+                                                                            }`}>
+                                                                                <span className={`w-1.5 h-1.5 rounded-full ${log.signature_valid ? 'bg-emerald-500' : 'bg-red-500'}`} />
+                                                                                {log.signature_valid ? 'Valid Sig' : 'Invalid Sig'}
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-xs text-gray-500">N/A</span>
+                                                                        )}
+
+                                                                        <div className="flex items-center gap-3">
+                                                                            <span className="text-xs text-gray-500 font-mono">
+                                                                                {new Date(log.created_at).toLocaleString()}
+                                                                            </span>
+                                                                            {isExpanded ? (
+                                                                                <ChevronUp className="w-4 h-4 text-gray-400" />
+                                                                            ) : (
+                                                                                <ChevronDown className="w-4 h-4 text-gray-400" />
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* Expandable Details */}
+                                                                {isExpanded && (
+                                                                    <div className="px-5 pb-5 border-t border-white/5 pt-4 space-y-4 animate-in fade-in duration-200">
+                                                                        <div>
+                                                                            <div className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1.5">Request Payload</div>
+                                                                            <pre className="bg-black/40 border border-white/5 p-4 rounded-xl text-xs text-purple-300 overflow-x-auto font-mono select-all">
+                                                                                {JSON.stringify(log.payload, null, 2)}
+                                                                            </pre>
+                                                                        </div>
+                                                                        {log.error_message && (
+                                                                            <div>
+                                                                                <div className="text-[10px] text-red-400 uppercase tracking-wider font-bold mb-1.5">Error Message</div>
+                                                                                <div className="text-xs text-red-400 bg-red-500/10 p-4 rounded-xl border border-red-500/20 font-medium">
+                                                                                    {log.error_message}
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Right: Metadata/Info */}
                                 <div className="space-y-8">
+                                    {/* Integration Health Monitoring Card */}
+                                    <div className="bg-[#211438] border border-purple-500/20 rounded-2xl p-8 space-y-6">
+                                        <div className="flex items-center justify-between">
+                                            <h3 className="font-bold text-lg text-gray-300 flex items-center gap-2">
+                                                <Activity className="w-5 h-5 text-purple-400" />
+                                                Integration Health
+                                            </h3>
+                                            <span className={`w-2 h-2 rounded-full ${
+                                                integrationStatus === 'live' ? 'bg-emerald-500 animate-pulse' :
+                                                integrationStatus === 'testing' ? 'bg-blue-500 animate-pulse' :
+                                                integrationStatus === 'dev_integrating' ? 'bg-amber-500' : 'bg-gray-500'
+                                            }`} />
+                                        </div>
+
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="text-xs text-gray-500 uppercase tracking-wider font-bold mb-1.5 block">Integration Status</label>
+                                                <div className="relative">
+                                                    <select
+                                                        value={integrationStatus}
+                                                        disabled={updatingStatus}
+                                                        onChange={(e) => handleStatusChange(e.target.value)}
+                                                        className={`w-full bg-black/40 border rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/50 appearance-none font-semibold ${
+                                                            integrationStatus === 'live' ? 'text-emerald-400 border-emerald-500/30' :
+                                                            integrationStatus === 'testing' ? 'text-blue-400 border-blue-500/30' :
+                                                            integrationStatus === 'dev_integrating' ? 'text-amber-400 border-amber-500/30' : 'text-gray-400 border-white/10'
+                                                        }`}
+                                                    >
+                                                        <option value="pending" className="bg-[#1a0b2e] text-gray-400 font-semibold">Pending</option>
+                                                        <option value="dev_integrating" className="bg-[#1a0b2e] text-amber-400 font-semibold">Dev Integrating</option>
+                                                        <option value="testing" className="bg-[#1a0b2e] text-blue-400 font-semibold">Testing</option>
+                                                        <option value="live" className="bg-[#1a0b2e] text-emerald-400 font-semibold">Live</option>
+                                                    </select>
+                                                    <div className="absolute inset-y-0 right-0 flex items-center px-4 pointer-events-none text-gray-500">
+                                                        <ChevronDown className="w-4 h-4" />
+                                                    </div>
+                                                </div>
+                                                <p className="text-[10px] text-gray-500 mt-1">
+                                                    {integrationStatus === 'live' ? "Automated handshakes verified. Game is live." :
+                                                     integrationStatus === 'testing' ? "In testing mode. First valid signature promotes to Live." :
+                                                     integrationStatus === 'dev_integrating' ? "Developer actively linking API calls." :
+                                                     "Awaiting initial setup."}
+                                                </p>
+                                            </div>
+
+                                            <hr className="border-white/5" />
+
+                                            <div className="space-y-3 text-sm">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500">Total Runs Completed</span>
+                                                    <span className="font-mono font-bold text-white bg-white/5 px-2 py-0.5 rounded-md">
+                                                        {totalSessionsCompleted}
+                                                    </span>
+                                                </div>
+                                                
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-xs text-gray-500">Last Event Received</span>
+                                                    <span className={`font-mono text-xs ${getRelativeTimeString(lastEventReceivedAt).colorClass}`}>
+                                                        {getRelativeTimeString(lastEventReceivedAt).text}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <hr className="border-white/5" />
+
+                                            <div className="pt-2">
+                                                <a
+                                                    href={`/magicadmins/games/${id}/doc?autoprint=true`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 hover:bg-purple-500 active:scale-[0.98] text-white rounded-xl text-sm font-bold shadow-lg shadow-purple-500/20 transition-all text-center select-none cursor-pointer"
+                                                >
+                                                    <FileDown className="w-4 h-4" />
+                                                    Generate Developer Doc
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div className="bg-white/5 border border-white/10 rounded-2xl p-8 space-y-6">
                                         <h3 className="font-bold text-lg text-gray-300">About This Game</h3>
 

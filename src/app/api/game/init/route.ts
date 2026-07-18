@@ -6,52 +6,125 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+async function logIntegrationEvent(
+  gameId: string | null,
+  endpoint: 'init' | 'match_complete',
+  statusCode: number,
+  payload: any,
+  errorMessage: string | null = null,
+  signatureValid: boolean | null = null
+) {
+  try {
+    await supabaseAdmin
+      .from('integration_logs')
+      .insert({
+        game_id: gameId,
+        endpoint,
+        status_code: statusCode,
+        payload,
+        error_message: errorMessage,
+        signature_valid: signatureValid
+      });
+  } catch (err) {
+    console.error('Failed to write integration log:', err);
+  }
+}
+
+async function updateLastEventReceived(gameId: string) {
+  try {
+    await supabaseAdmin
+      .from('games')
+      .update({ last_event_received_at: new Date().toISOString() })
+      .eq('id', gameId);
+  } catch (err) {
+    console.error('Failed to update last_event_received_at:', err);
+  }
+}
+
 async function processInit(sessionId: string | null) {
-  if (!sessionId) {
-    return NextResponse.json({ error: 'Session ID is required' }, { status: 400 });
-  }
+  let gameId: string | null = null;
+  let responseData: any = null;
+  let statusCode = 200;
+  let errorMessage: string | null = null;
 
-  // 1. Fetch Game Session Data
-  const { data: session, error: sessionError } = await supabaseAdmin
-    .from('game_sessions')
-    .select(`
-      id, mode, status,
-      game:games(title, slug),
-      user:profiles(id, full_name, username, avatar_url)
-    `)
-    .eq('id', sessionId)
-    .single();
-
-  if (sessionError || !session) {
-    return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-  }
-
-  // 2. Format Response
-  const user = Array.isArray(session.user) ? session.user[0] : session.user;
-  const game = Array.isArray(session.game) ? session.game[0] : session.game;
-
-  return NextResponse.json({
-    success: true,
-    session: {
-      id: session.id,
-      mode: session.mode,
-      status: session.status,
-      game_title: (game as any)?.title || 'Unknown Game',
-      game_slug: (game as any)?.slug
-    },
-    player: {
-      id: (user as any)?.id,
-      name: (user as any)?.full_name || 'Anonymous User',
-      username: (user as any)?.username,
-      avatar: (user as any)?.avatar_url
+  try {
+    if (!sessionId) {
+      statusCode = 400;
+      responseData = { error: 'Session ID is required' };
+      errorMessage = 'Session ID is required';
+      return NextResponse.json(responseData, { status: statusCode });
     }
-  }, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
+
+    // 1. Fetch Game Session Data (include game_id)
+    const { data: session, error: sessionError } = await supabaseAdmin
+      .from('game_sessions')
+      .select(`
+        id, game_id, mode, status,
+        game:games(title, slug),
+        user:profiles(id, full_name, username, avatar_url)
+      `)
+      .eq('id', sessionId)
+      .maybeSingle();
+
+    if (sessionError) {
+      statusCode = 500;
+      responseData = { error: 'Database error fetching session', details: sessionError.message };
+      errorMessage = sessionError.message;
+      return NextResponse.json(responseData, { status: statusCode });
     }
-  });
+
+    if (!session) {
+      statusCode = 404;
+      responseData = { error: 'Session not found' };
+      errorMessage = 'Session not found';
+      return NextResponse.json(responseData, { status: statusCode });
+    }
+
+    gameId = session.game_id;
+    const user = Array.isArray(session.user) ? session.user[0] : session.user;
+    const game = Array.isArray(session.game) ? session.game[0] : session.game;
+
+    responseData = {
+      success: true,
+      session: {
+        id: session.id,
+        mode: session.mode,
+        status: session.status,
+        game_title: (game as any)?.title || 'Unknown Game',
+        game_slug: (game as any)?.slug
+      },
+      player: {
+        id: (user as any)?.id,
+        name: (user as any)?.full_name || 'Anonymous User',
+        username: (user as any)?.username,
+        avatar: (user as any)?.avatar_url
+      }
+    };
+
+    // Update last_event_received_at on success
+    if (gameId) {
+      await updateLastEventReceived(gameId);
+    }
+
+    return NextResponse.json(responseData, {
+      status: statusCode,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      }
+    });
+
+  } catch (err: any) {
+    statusCode = 500;
+    responseData = { error: 'Internal server error', message: err.message };
+    errorMessage = err.message;
+    return NextResponse.json(responseData, { status: statusCode });
+  } finally {
+    // Log call to integration_logs (success or failure)
+    const logPayload = { sessionId };
+    await logIntegrationEvent(gameId, 'init', statusCode, logPayload, errorMessage);
+  }
 }
 
 export async function GET(req: Request) {
